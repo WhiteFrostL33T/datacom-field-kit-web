@@ -174,7 +174,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='2.9.3';
+var APP_VERSION='2.9.4';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -274,7 +274,7 @@ function renderTabBar(){
     return '<button class="btab'+(active===t.id?' act':'')+'" onclick="go'+t.label+'()">'+t.icon+'<span>'+t.label+'</span></button>';
   }).join('');
 }
-function render(){
+function render(skipTrack){
   $('hdrsub').textContent=view.name==='projects'?'Projects':
     view.name==='timer'?'Timer':
     view.name==='dashboard'?'Dashboard':
@@ -289,6 +289,7 @@ function render(){
   else if(view.name==='about')renderAbout();
   else renderProject();
   renderTabBar();
+  if(!skipTrack)trackNav(true);
 }
 /* ============ timer ============ */
 var timerInt=null;
@@ -1091,6 +1092,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'2.9.4',items:['Swipe-back now walks through app screens instead of closing the app','Refresh/reopen picks up where you left off']},
  {v:'2.9.3',items:['Fixed: active tab no longer renders as a blue pill hiding the icon (CSS class collision)']},
  {v:'2.9.2',items:['Tab bar icons stay visible when selected','Inside a project, the bottom bar switches modules (icons only, enabled modules)']},
  {v:'2.9.1',items:['Bottom tab bar: Projects, Timer, Dashboard','Timer tab with quick-start and live timer','Dashboard activity feed across all projects','Backup, Import and About in the header menu']},
@@ -1130,7 +1132,30 @@ function importBackup(){
     }catch(e){$('bk_msg').innerHTML='<div class="err">Import failed: '+esc(e.message)+'</div>';}
   };
   r.readAsText(f);}
+/* ============ nav history + view persistence ============ */
+var lastNav='';
+function navState(){return {v:view.name,id:view.id||null,tab:curTab};}
+function trackNav(push){
+  var s=JSON.stringify(navState());
+  if(push&&s!==lastNav){lastNav=s;try{history.pushState(navState(),'');}catch(e){}}
+  else if(!push){lastNav=s;}
+  try{localStorage.setItem('fk_view',s);}catch(e){}
+}
+window.addEventListener('popstate',function(e){
+  var s=e.state;
+  if(s&&s.v){view={name:s.v};if(s.id)view.id=s.id;else delete view.id;curTab=s.tab||'overview';}
+  else{view={name:'projects'};delete view.id;curTab='overview';}
+  render(true);
+  trackNav(false);
+});
 /* ============ init ============ */
+(function(){
+  try{
+    var s=JSON.parse(localStorage.getItem('fk_view')||'null');
+    if(s&&s.v){view={name:s.v};if(s.id)view.id=s.id;curTab=s.tab||'overview';}
+  }catch(e){}
+  lastNav=JSON.stringify(navState());
+})();
 render();
 </script>
 </body>
