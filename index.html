@@ -204,7 +204,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.3';
+var APP_VERSION='3.0.4';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1145,6 +1145,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.4',items:['Fixed projects sync: replaced upsert with explicit INSERT (falls back to UPDATE on conflict) \u2014 Postgres enforces both INSERT and UPDATE RLS policies on upsert, and the update check fails for rows that do not exist yet']},
  {v:'3.0.3',items:['New \u22ee menu item: Sync diagnostics (shows sign-in, token match, project ownership)','Fixed: a background pull could mark failed uploads as synced']},
  {v:'3.0.2',items:['Fixed sync 403 on projects: edits now use explicit UPDATE instead of upsert (Postgres re-checks the INSERT policy on upsert, failing when owner_id is omitted)']},
  {v:'3.0.1',items:['Fixed: first sync failed when projects had technicians or calculator data (child rows now push after their project)','Sync errors now show the actual reason']},
@@ -1471,6 +1472,9 @@ function pushChanges(){
     var o={}; for(var k in row) if(k!=='id') o[k]=row[k];
     return sb.from(table).update(o).eq('id',id).then(function(r){ if(r.error) throw r.error; });
   }
+  function insertRow(table,row){
+    return sb.from(table).insert(row).then(function(r){ if(r.error) throw r.error; });
+  }
   function softDel(table,id){
     return sb.from(table).update({deleted_at:new Date().toISOString()}).eq('id',id)
       .then(function(r){ if(r.error) throw r.error; });
@@ -1480,7 +1484,23 @@ function pushChanges(){
     var d=diffArrays(data[cfg.key]||[],snap[cfg.key]||[]);
     var snapById={}; (snap[cfg.key]||[]).forEach(function(r){ if(r&&r.id) snapById[r.id]=1; });
     var jobs=[];
-    d.added.forEach(function(r){ jobs.push(upsert(cfg.table,toDB(cfg.table,r,true))); });
+    d.added.forEach(function(r){
+      if(cfg.table==='projects'){
+        // NEVER upsert projects: ON CONFLICT DO UPDATE fails RLS for new rows
+        // because the UPDATE check is_project_member(id) is false until the row
+        // exists (Postgres enforces both policies on upsert). Explicit INSERT,
+        // falling back to UPDATE when the row is already there (409).
+        jobs.push(insertRow('projects',toDB('projects',r,true)).catch(function(e){
+          if(e&&e.code==='23505'){
+            var row=toDB('projects',r,false); delete row.owner_id;
+            return updateRow('projects',r.id,row);
+          }
+          throw e;
+        }));
+      } else {
+        jobs.push(upsert(cfg.table,toDB(cfg.table,r,true)));
+      }
+    });
     d.changed.forEach(function(r){
       // explicit UPDATE: ownership is set at insert and never touched here.
       // (upsert would re-run the INSERT RLS check against a row without owner_id -> 403)
