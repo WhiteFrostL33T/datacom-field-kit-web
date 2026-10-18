@@ -204,7 +204,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0';
+var APP_VERSION='3.0.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1145,6 +1145,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.1',items:['Fixed: first sync failed when projects had technicians or calculator data (child rows now push after their project)','Sync errors now show the actual reason']},
  {v:'3.0',items:['Sign in with your Field Kit account','Projects sync across devices in real time','Invite teammates to a project','Works offline — changes sync when you reconnect']},
  {v:'2.9.7',items:['Export moved into the card \u22ee menu','New module icons: cable spool, patch panel, ethernet port']},
  {v:'2.9.6',items:['Module toggles moved into a gear dialog in the Details card','Technicians card: shorter title, + button to add, trash icon to remove']},
@@ -1461,7 +1462,6 @@ function fromDB(table,r){
 function pushChanges(){
   if(!sb||!sbUser) return Promise.resolve();
   var snap=lastSynced||emptySnapshot();
-  var jobs=[];
   function upsert(table,row){
     return sb.from(table).upsert(row,{onConflict:'id'}).then(function(r){ if(r.error) throw r.error; });
   }
@@ -1469,15 +1469,29 @@ function pushChanges(){
     return sb.from(table).update({deleted_at:new Date().toISOString()}).eq('id',id)
       .then(function(r){ if(r.error) throw r.error; });
   }
-  SYNC_TABLES.forEach(function(cfg){
+  function cfgFor(key){ for(var i=0;i<SYNC_TABLES.length;i++) if(SYNC_TABLES[i].key===key) return SYNC_TABLES[i]; return null; }
+  function pushTable(cfg){
     var d=diffArrays(data[cfg.key]||[],snap[cfg.key]||[]);
     var snapById={}; (snap[cfg.key]||[]).forEach(function(r){ if(r&&r.id) snapById[r.id]=1; });
+    var jobs=[];
     d.added.concat(d.changed).forEach(function(r){ jobs.push(upsert(cfg.table,toDB(cfg.table,r,!snapById[r.id]))); });
     d.removed.forEach(function(r){ jobs.push(softDel(cfg.table,r.id)); });
-  });
-  jobs.push(pushTechnicians(snap));
-  jobs.push(pushSettings(snap));
-  return Promise.all(jobs).then(function(){});
+    return Promise.all(jobs);
+  }
+  // Phase 1: projects first — RLS on child tables requires the parent row to exist
+  return pushTable(cfgFor('projects')).then(function(){
+    // Phase 2: switches (devices/ports reference them)
+    return Promise.all([pushTable(cfgFor('poeSwitches')),pushTable(cfgFor('portSwitches'))]);
+  }).then(function(){
+    // Phase 3: everything else
+    var jobs=[];
+    ['timeEntries','pulls','materials','poeDevices','portEntries','ipAssignments'].forEach(function(k){
+      jobs.push(pushTable(cfgFor(k)));
+    });
+    jobs.push(pushTechnicians(snap));
+    jobs.push(pushSettings(snap));
+    return Promise.all(jobs);
+  }).then(function(){});
 }
 function pushTechnicians(snap){
   return sb.from('technicians').select('id,project_id,name').is('deleted_at',null).then(function(r){
@@ -1580,9 +1594,10 @@ function setSyncStatus(s){
   var el=document.getElementById('syncstat');
   if(el) el.textContent=syncStatusText();
 }
+var syncErrMsg='';
 function syncStatusText(){
   if(syncStatus==='syncing') return 'Syncing…';
-  if(syncStatus==='offline') return 'Offline — changes saved on this device';
+  if(syncStatus==='offline') return syncErrMsg?('Sync error: '+syncErrMsg.slice(0,90)):'Offline — changes saved on this device';
   if(syncStatusAt) return 'Synced '+new Date(syncStatusAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
   return 'Not synced yet';
 }
@@ -1608,8 +1623,9 @@ function syncNow(manual){
     if(manual) toast(changed?'Sync complete':'Already up to date');
     return changed;
   }).catch(function(e){
+    syncErrMsg=(e&&e.message)||'unknown error';
     setSyncStatus('offline');
-    if(manual) toast('Sync failed — will retry when connected');
+    if(manual) toast('Sync failed: '+syncErrMsg.slice(0,120));
     return false;
   }).then(function(r){ syncing=false; return r; });
 }
