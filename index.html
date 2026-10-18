@@ -96,6 +96,25 @@ color:#bcd2e8;text-align:center;font-size:.68rem;padding:8px 10px;letter-spacing
   padding:11px 6px;cursor:pointer;min-height:48px;font-size:.9rem;}
 .seg button.act{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;}
 .preset{flex:0 0 auto !important;min-width:0;}
+.fab{position:fixed;right:18px;bottom:54px;width:62px;height:62px;border-radius:50%;
+  background:var(--accent);color:#fff;font-size:30px;line-height:1;border:none;z-index:40;
+  box-shadow:0 4px 16px rgba(0,0,0,.5);cursor:pointer;}
+.projcard{cursor:pointer;}
+.iconbtn{background:none;border:none;color:var(--muted);font-size:1.35rem;cursor:pointer;
+  padding:8px 12px;min-width:44px;min-height:44px;border-radius:10px;}
+.cardmenu{position:relative;flex:0 0 auto;}
+.cardmenu .cmenu{position:absolute;top:calc(100% + 2px);right:0;background:#1a2635;
+  border:1px solid var(--line);border-radius:10px;z-index:30;min-width:150px;overflow:hidden;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);}
+.cardmenu .cmenu button{display:block;width:100%;text-align:left;background:none;border:none;
+  padding:13px 14px;font-size:.95rem;cursor:pointer;color:var(--text);}
+.cardmenu .cmenu button.danger{color:var(--red);}
+.hdrmenu{position:relative;flex:0 0 auto;}
+.hdrmenu .cmenu{position:absolute;top:calc(100% + 6px);right:0;background:#1a2635;
+  border:1px solid var(--line);border-radius:10px;z-index:60;min-width:170px;overflow:hidden;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);}
+.hdrmenu .cmenu button{display:block;width:100%;text-align:left;background:none;border:none;
+  padding:13px 14px;font-size:.95rem;cursor:pointer;color:var(--text);}
 </style>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js");}</script>
 </head>
@@ -104,6 +123,8 @@ color:#bcd2e8;text-align:center;font-size:.68rem;padding:8px 10px;letter-spacing
   <div class="ttl" style="display:flex;align-items:center;gap:10px"><img src="logo.png" alt="" style="width:38px;height:38px;border-radius:9px;flex:0 0 auto"><div>Datacom Field Kit<small id="hdrsub">Projects</small></div></div>
   <button class="hbtn" id="btnHome">Projects</button>
   <button class="hbtn" id="btnBackup">Backup</button>
+  <div class="hdrmenu"><button class="hbtn" id="btnMore" aria-label="More options">&#8942;</button>
+    <div class="cmenu" id="hdrMenu" style="display:none"><button onclick="openImportForm()">Import project</button></div></div>
 </header>
 <div id="timerbar"></div>
 <main id="app"></main>
@@ -140,7 +161,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='2.8';
+var APP_VERSION='2.9';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -204,6 +225,13 @@ function openProject(id){view={name:'project',id:id};curTab='overview';render();
 function setTab(t){curTab=t;render();}
 $('btnHome').addEventListener('click',goProjects);
 $('btnBackup').addEventListener('click',goBackup);
+$('btnMore').addEventListener('click',function(e){e.stopPropagation();toggleHdrMenu();});
+document.addEventListener('click',function(){var m=$('hdrMenu');if(m)m.style.display='none';});
+function toggleHdrMenu(){var m=$('hdrMenu');m.style.display=m.style.display==='none'?'block':'none';}
+function openImportForm(){
+  if(view.name!=='projects')goProjects();
+  var f=$('importForm');if(f&&f.style.display==='none')toggleImportForm();
+  window.scrollTo(0,0);}
 function render(){
   $('hdrsub').textContent=view.name==='projects'?'Projects':
     view.name==='backup'?'Backup / Restore':
@@ -249,8 +277,7 @@ function stopTimer(){
 <script>
 /* ============ PROJECTS LIST ============ */
 function renderProjects(){
-  var h='<button class="btn" onclick="toggleProjForm()">+ New Project</button>';
-  h+='<div id="projForm" style="display:none;margin-top:12px"><div class="card"><h3>New project</h3>'
+  var h='<div id="projForm" style="display:none"><div class="card"><h3>New project</h3>'
     +'<label>Project name *</label><input id="np_name" placeholder="e.g. Lobby camera install">'
     +'<div class="row"><div><label>Customer</label><input id="np_customer"></div>'
     +'<div><label>Site</label><input id="np_site"></div></div>'
@@ -260,8 +287,7 @@ function renderProjects(){
   if(!data.projects.length){
     h+='<div class="card" style="margin-top:12px"><p class="mut">No projects yet. Create your first project to start tracking time, cable, materials and more.</p></div>';
   }
-  h+='<button class="btn sec" style="margin:8px 0 12px" onclick="toggleImportForm()">Import Project</button>'
-    +'<div id="importForm" style="display:none;margin-top:12px"><div class="card"><h3>Import project</h3>'
+  h+='<div id="importForm" style="display:none;margin-top:12px"><div class="card"><h3>Import project</h3>'
     +'<p class="mut">Bring in a project exported from another device (a fieldkit-*.json file).</p>'
     +'<input id="ip_file" type="file" accept=".json,.txt,application/json,text/plain">'
     +'<button class="btn sec" onclick="importProjectFile()">Import project</button>'
@@ -269,10 +295,11 @@ function renderProjects(){
   data.projects.slice().sort(function(a,b){return ((a.status==='done')-(b.status==='done'))||((b.createdAt||0)-(a.createdAt||0));})
   .forEach(function(p){
     var mods=enabledMods(p);
-    h+='<div class="card"><div class="proj-head"><div class="grow"><h3>'+esc(p.name)+'</h3>'
+    h+='<div class="card projcard" onclick="openProject(\''+p.id+'\')"><div class="proj-head"><div class="grow"><h3>'+esc(p.name)+'</h3>'
       +'<div class="mut">'+esc(p.customer||'')+(p.customer&&p.site?' · ':'')+esc(p.site||'')
       +(p.ticket?'<br>ConnectWise #'+esc(p.ticket):'')+'<br>Status: '+esc(p.status||'active')+'</div></div>'
-      +'<button class="edt" onclick="delProject(\''+p.id+'\')">Delete</button></div>'
+      +'<div class="cardmenu"><button class="iconbtn" aria-label="Project actions" onclick="event.stopPropagation();toggleCardMenu(\''+p.id+'\')">&#8942;</button>'
+      +'<div class="cmenu" id="cmenu-'+p.id+'" style="display:none"><button class="danger" onclick="event.stopPropagation();delProject(\''+p.id+'\')">Delete</button></div></div></div>'
       +'<div style="margin:8px 0">'+mods.map(function(m){
           var lbl=MODULES.filter(function(x){return x[0]===m;})[0];
           return '<span class="chip on">'+esc(lbl?lbl[1]:m)+'</span>';}).join('')+'</div>'
@@ -280,11 +307,20 @@ function renderProjects(){
       +'<div class="mut">Time tracked</div><b>'+fmtHM(projectMinutes(p.id))+'</b></div>'
       +'<div class="card" style="background:var(--panel2);margin:0;padding:10px;text-align:center">'
       +'<div class="mut">Cable used</div><b>'+projectCableFt(p.id)+' ft</b></div></div>'
-      +'<div class="row" style="margin-top:10px"><button class="btn" style="flex:1" onclick="openProject(\''+p.id+'\')">Open project</button>'
-      +'<button class="btn sec" onclick="exportProject(\''+p.id+'\')">Export</button></div></div>';
+      +'<div style="margin-top:10px"><button class="btn sec" onclick="event.stopPropagation();exportProject(\''+p.id+'\')">Export</button></div></div>';
   });
+  h+='<button class="fab" aria-label="New project" onclick="fabNewProject()">+</button>';
   $('app').innerHTML=h;
 }
+function fabNewProject(){
+  if(view.name!=='projects')goProjects();
+  var f=$('projForm');var opening=f&&f.style.display==='none';
+  toggleProjForm();
+  if(opening){window.scrollTo(0,0);setTimeout(function(){var n=$('np_name');if(n)n.focus();},60);}}
+function toggleCardMenu(id){
+  var m=$('cmenu-'+id);if(!m)return;var was=m.style.display!=='none';
+  Array.prototype.forEach.call(document.querySelectorAll('.cardmenu .cmenu'),function(x){x.style.display='none';});
+  if(!was)m.style.display='block';}
 function toggleProjForm(){var f=$('projForm');f.style.display=f.style.display==='none'?'block':'none';}
 function toggleImportForm(){var f=$('importForm');f.style.display=f.style.display==='none'?'block':'none';}
 function createProject(){
