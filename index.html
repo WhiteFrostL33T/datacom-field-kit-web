@@ -61,6 +61,7 @@ table{width:100%;border-collapse:collapse;font-size:.92rem;}
 th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top;}
 th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.4px;}
 .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);}
+.tbadge{display:inline-block;font-size:.68rem;padding:2px 10px;border-radius:10px;color:#e8f0f8;white-space:nowrap;}
 .kv:last-child{border-bottom:none;}
 .kv b{font-weight:600;}
 .bar{height:14px;background:#0a1119;border-radius:7px;overflow:hidden;border:1px solid var(--line);}
@@ -204,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.4';
+var APP_VERSION='3.0.5';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -262,7 +263,6 @@ function fallbackCopy(text){var ta=document.createElement('textarea');ta.value=t
 /* ============ routing ============ */
 var view={name:'projects'};
 var curTab='overview';
-var techFormOpen=false;
 function goProjects(){view={name:'projects'};render();}
 function goTimer(){view={name:'timer'};render();}
 function goDashboard(){view={name:'dashboard'};render();}
@@ -520,6 +520,7 @@ function importProjectFile(){
 function renderProject(){
   var p=projById(view.id);
   if(!p){goProjects();return;}
+  loadMembers(p.id);
   var mods=enabledMods(p);
   if(curTab!=='overview'&&mods.indexOf(curTab)<0)curTab='overview';
   var h='<button class="btn sec sml" onclick="goProjects()">&#8592; All projects</button>'
@@ -582,30 +583,48 @@ function openModuleDialog(){
 }
 function closeModuleDialog(){var o=document.getElementById('modDlg');if(o)o.remove();}
 function techList(p){if(!p.technicians)p.technicians=[];return p.technicians;}
+var memberCache={};
+function tbadge(label,color){
+  return '<span class="tbadge" style="background:'+color+'">'+label+'</span>';
+}
+function loadMembers(pid,force){
+  var p=projById(pid); if(!p||!sb||!sbUser) return;
+  var c=memberCache[pid];
+  if(c&&c.loading) return;
+  if(c&&!c.failed&&!force) return;
+  memberCache[pid]={loading:true};
+  sb.from('project_members').select('user_id').eq('project_id',pid).then(function(r){
+    if(r.error){ memberCache[pid]={failed:true}; if(view.name==='project'&&view.id===pid)render(); return; }
+    var ids=(r.data||[]).map(function(m){return m.user_id;});
+    var ownerId=p.owner_id||sbUser.id;
+    sb.from('profiles').select('id,email').in('id',ids.concat([ownerId])).then(function(r2){
+      var emails={}; (r2.data||[]).forEach(function(pr){emails[pr.id]=pr.email;});
+      memberCache[pid]={ownerId:ownerId,ownerEmail:emails[ownerId]||'you',
+        members:(r.data||[]).filter(function(m){return m.user_id!==ownerId;})
+          .map(function(m){return{id:m.user_id,email:emails[m.user_id]||String(m.user_id).slice(0,8)+'…'};})};
+      if(view.name==='project'&&view.id===pid)render();
+    });
+  });
+}
 function techCardHTML(p){
   var techs=techList(p);
-  var h='<div class="card"><div class="cardhd"><h3>Technicians</h3><button class="gearbtn" aria-label="Add technician" onclick="toggleTechForm()">'+(techFormOpen?'&times;':PLUS_SVG)+'</button></div>';
-  if(techs.length){
-    h+=techs.map(function(t,i){
-      return '<div class="kv"><span>'+esc(t)+'</span><button class="iconbtn" aria-label="Remove technician" onclick="delTech('+i+')">'+TRASH_SVG+'</button></div>';}).join('');
-  }else{
-    h+='<p class="mut">No technicians listed yet.</p>';
+  var mc=memberCache[p.id];
+  var h='<div class="card"><div class="cardhd"><h3>Technicians</h3></div>';
+  var shown=false;
+  if(mc&&!mc.loading&&!mc.failed){
+    h+='<div class="kv"><span>'+esc(mc.ownerEmail)+'</span>'+tbadge('owner','#1d5c96')+'</div>';
+    mc.members.forEach(function(m){
+      h+='<div class="kv"><span>'+esc(m.email)+'</span>'+tbadge('member','#2a4a63')+'</div>';
+    });
+    shown=true;
   }
-  if(techFormOpen){
-    h+='<div class="row" style="margin-top:8px"><input id="tech_name" placeholder="Tech name" style="flex:1">'
-      +'<button class="btn grn" onclick="addTech()">Add</button></div>';
-  }
+  techs.forEach(function(t){
+    h+='<div class="kv"><span class="mut">'+esc(t)+'</span>'+tbadge('legacy','#3a3f47')+'</div>';
+    shown=true;
+  });
+  if(!shown) h+=((sb&&sbUser)?'<p class="mut">Loading members…</p>':'<p class="mut">Sign in to see project members.</p>');
+  h+='<p class="mut" style="font-size:.75rem;margin:8px 0 0">Members are managed via \u22ee \u2192 Share project</p>';
   return h+'</div>';}
-function toggleTechForm(){techFormOpen=!techFormOpen;render();}
-function addTech(){
-  var p=projById(view.id);if(!p)return;
-  var name=val('tech_name');if(!name){toast('Enter a name');return;}
-  techList(p).push(name);save();render();toast('Technician added');}
-function delTech(i){
-  var p=projById(view.id);if(!p)return;
-  var techs=techList(p);
-  if(!confirm('Remove '+techs[i]+' from this job?'))return;
-  techs.splice(i,1);save();render();}
 function toggleModule(mod,on){
   var p=projById(view.id);if(!p)return;
   if(ALWAYS_ON.indexOf(mod)>=0)return;
@@ -1145,6 +1164,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.5',items:['Technicians card now reflects project membership: owner + invited members (badged), hand-typed names kept as read-only legacy rows; manual add/remove removed \u2014 members are managed via \u22ee \u2192 Share project']},
  {v:'3.0.4',items:['Fixed projects sync: replaced upsert with explicit INSERT (falls back to UPDATE on conflict) \u2014 Postgres enforces both INSERT and UPDATE RLS policies on upsert, and the update check fails for rows that do not exist yet']},
  {v:'3.0.3',items:['New \u22ee menu item: Sync diagnostics (shows sign-in, token match, project ownership)','Fixed: a background pull could mark failed uploads as synced']},
  {v:'3.0.2',items:['Fixed sync 403 on projects: edits now use explicit UPDATE instead of upsert (Postgres re-checks the INSERT policy on upsert, failing when owner_id is omitted)']},
@@ -1282,6 +1302,7 @@ function onSignedIn(session,keepView){
   subscribeRealtime();
 }
 function onSignedOut(){
+  memberCache={};
   sbUser=null;
   if(rtChannel){ try{sb.removeChannel(rtChannel);}catch(e){} rtChannel=null; }
   if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
@@ -1669,7 +1690,10 @@ function subscribeRealtime(){
     ['projects','technicians','time_entries','cable_pulls','materials','poe_switches',
      'poe_devices','port_switches','port_entries','ip_assignments','project_settings',
      'project_members'].forEach(function(t){
-      rtChannel.on('postgres_changes',{event:'*',schema:'public',table:t},function(){ queuePull(); });
+      rtChannel.on('postgres_changes',{event:'*',schema:'public',table:t},function(){
+        if(t==='project_members'&&view.name==='project') loadMembers(view.id,true);
+        queuePull();
+      });
     });
     rtChannel.subscribe();
   }catch(e){ rtChannel=null; }
@@ -1810,7 +1834,7 @@ function inviteMember(){
         if(r2.error){ toast('Invite failed'); return; }
         toast('Invited '+em);
         var ie=document.getElementById('inv_email'); if(ie) ie.value='';
-        loadShareList();
+        loadShareList(); loadMembers(view.id,true);
       });
   });
 }
@@ -1818,7 +1842,7 @@ function removeMember(uid2){
   if(!confirm('Remove this person from the project?')) return;
   sb.from('project_members').delete().eq('project_id',view.id).eq('user_id',uid2).then(function(r){
     if(r.error){ toast('Could not remove'); return; }
-    loadShareList();
+    loadShareList(); loadMembers(view.id,true);
   });
 }
 

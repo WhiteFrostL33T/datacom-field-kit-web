@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v3.0.4
+**Current version:** v3.0.5
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,10 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v3.0.5** — Technicians card now reflects project membership (owner +
+  invited members, badged); hand-typed names kept as read-only legacy rows;
+  manual add/remove removed.
 
 - **v3.0.4** — Fixed projects sync (the real root cause): Postgres enforces
   both INSERT and UPDATE RLS policies on upsert, and the update check fails
