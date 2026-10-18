@@ -174,7 +174,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='2.9.4';
+var APP_VERSION='2.9.5';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1092,6 +1092,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'2.9.5',items:['About page shows only the last 4 changelog entries']},
  {v:'2.9.4',items:['Swipe-back now walks through app screens instead of closing the app','Refresh/reopen picks up where you left off']},
  {v:'2.9.3',items:['Fixed: active tab no longer renders as a blue pill hiding the icon (CSS class collision)']},
  {v:'2.9.2',items:['Tab bar icons stay visible when selected','Inside a project, the bottom bar switches modules (icons only, enabled modules)']},
@@ -1103,7 +1104,7 @@ function renderAbout(){
   var h='<div class="card"><h3>Field Kit Web</h3><span class="ver">v'+APP_VERSION+'</span>'
     +'<p class="mut">Jeremy\u2019s field toolkit for MHS Enterprises site work.</p>'
     +'<div class="seclbl">What\u2019s new</div>'
-    +CHANGELOG.map(function(c){
+    +CHANGELOG.slice(0,4).map(function(c){
       return '<h4 style="margin:12px 0 4px">v'+c.v+'</h4><ul style="margin:0 0 8px;padding-left:20px;color:var(--muted);font-size:.9rem;line-height:1.65">'
         +c.items.map(function(i){return '<li>'+esc(i)+'</li>';}).join('')+'</ul>';}).join('')
     +'</div>';
