@@ -89,6 +89,15 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px;min-height:58px;border-radius:10px;}
 .btab svg{width:26px;height:26px;flex:0 0 auto;}
 .btab.act{color:#5aa9e6;}
+.cardhd{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px;}
+.cardhd h3{margin:0;}
+.gearbtn{background:var(--secbg);border:1px solid var(--line);color:var(--muted);border-radius:10px;
+  width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}
+.gearbtn svg{width:20px;height:20px;}
+.dlg-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;
+  align-items:center;justify-content:center;padding:20px;}
+.dlg{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  max-width:420px;width:100%;max-height:80vh;overflow:auto;padding:18px;}
 .seclbl{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px;}
 .bigtime{font-size:2.4rem;font-weight:800;text-align:center;letter-spacing:2px;margin:8px 0 12px;font-variant-numeric:tabular-nums;}
 .ver{display:inline-block;background:var(--chip);border:1px solid var(--line);color:#9fc3e8;
@@ -117,6 +126,7 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
 .projcard{cursor:pointer;}
 .iconbtn{background:none;border:none;color:var(--muted);font-size:1.35rem;cursor:pointer;
   padding:8px 12px;min-width:44px;min-height:44px;border-radius:10px;}
+.iconbtn svg{width:18px;height:18px;vertical-align:-3px;}
 .cardmenu{position:relative;flex:0 0 auto;}
 .cardmenu .cmenu{position:absolute;top:calc(100% + 2px);right:0;background:#1a2635;
   border:1px solid var(--line);border-radius:10px;z-index:30;min-width:150px;overflow:hidden;
@@ -174,7 +184,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='2.9.5';
+var APP_VERSION='2.9.6';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -232,6 +242,7 @@ function fallbackCopy(text){var ta=document.createElement('textarea');ta.value=t
 /* ============ routing ============ */
 var view={name:'projects'};
 var curTab='overview';
+var techFormOpen=false;
 function goProjects(){view={name:'projects'};render();}
 function goTimer(){view={name:'timer'};render();}
 function goDashboard(){view={name:'dashboard'};render();}
@@ -250,6 +261,9 @@ var TABDEF=[
  {id:'projects',label:'Projects',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>'},
  {id:'timer',label:'Timer',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>'},
  {id:'dashboard',label:'Dashboard',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>'}];
+var TRASH_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+var PLUS_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>';
+var GEAR_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 var MODICONS={
  overview:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
  time:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
@@ -507,7 +521,7 @@ function renderProject(){
 }
 function overviewHTML(p){
   var mods=enabledMods(p);
-  var h='<div class="card"><h3>Details</h3>'
+  var h='<div class="card"><div class="cardhd"><h3>Details</h3><button class="gearbtn" aria-label="Module settings" onclick="openModuleDialog()">'+GEAR_SVG+'</button></div>'
     +'<div class="kv"><span class="mut">Customer</span><b>'+esc(p.customer||'—')+'</b></div>'
     +'<div class="kv"><span class="mut">Site</span><b>'+esc(p.site||'—')+'</b></div>'
     +'<div class="kv"><span class="mut">ConnectWise ticket</span><b>'+esc(p.ticket||'—')+'</b></div>'
@@ -522,28 +536,43 @@ function overviewHTML(p){
     +'<div class="kv"><span class="mut">Cable used</span><b>'+projectCableFt(p.id)+' ft</b></div>'
     +'<div class="kv"><span class="mut">Materials lines</span><b>'
     +data.materials.filter(function(m){return m.projectId===p.id;}).length+'</b></div></div>';
-  h+='<div class="card"><h3>Modules on this ticket</h3>'
-    + MODULES.filter(function(m){return ALWAYS_ON.indexOf(m[0])<0;}).map(function(m){
-      var on=mods.indexOf(m[0])>=0;
-      var locked=ALWAYS_ON.indexOf(m[0])>=0;
-      return '<div class="switch"><span>'+esc(m[1])+(locked?' <span class="mut">(always on)</span>':'')+'</span><span class="tgl"><input type="checkbox"'
-        +(on?' checked':'')+(locked?' disabled':'')+' onchange="toggleModule(\''+m[0]+'\',this.checked)"><i></i></span></div>';}).join('')
-    +'<p class="mut">Turning a module off hides its tab here — its data is kept and comes back when you turn it on again.</p></div>';
   return h;
 }
+function openModuleDialog(){
+  var p=projById(view.id);if(!p)return;
+  closeModuleDialog();
+  var mods=enabledMods(p);
+  var rows=MODULES.map(function(m){
+    var locked=ALWAYS_ON.indexOf(m[0])>=0;
+    var on=locked||mods.indexOf(m[0])>=0;
+    return '<div class="switch"><span>'+esc(m[1])+(locked?' <span class="mut">(always on)</span>':'')+'</span><span class="tgl"><input type="checkbox"'
+      +(on?' checked':'')+(locked?' disabled':'')+' onchange="toggleModule(\''+m[0]+'\',this.checked)"><i></i></span></div>';}).join('');
+  var ov=document.createElement('div');
+  ov.className='dlg-ov';ov.id='modDlg';
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Modules</h3></div>'
+    +'<p class="mut" style="margin-top:0">Sections for this project. Turning a module off hides its tab — its data is kept.</p>'
+    +rows
+    +'<button class="btn pri" style="width:100%;margin-top:12px" onclick="closeModuleDialog()">Done</button></div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)closeModuleDialog();});
+  document.body.appendChild(ov);
+}
+function closeModuleDialog(){var o=document.getElementById('modDlg');if(o)o.remove();}
 function techList(p){if(!p.technicians)p.technicians=[];return p.technicians;}
 function techCardHTML(p){
   var techs=techList(p);
-  var h='<div class="card"><h3>Technicians on this job</h3>';
+  var h='<div class="card"><div class="cardhd"><h3>Technicians</h3><button class="gearbtn" aria-label="Add technician" onclick="toggleTechForm()">'+(techFormOpen?'&times;':PLUS_SVG)+'</button></div>';
   if(techs.length){
     h+=techs.map(function(t,i){
-      return '<div class="kv"><span>'+esc(t)+'</span><button class="edt" onclick="delTech('+i+')">Remove</button></div>';}).join('');
+      return '<div class="kv"><span>'+esc(t)+'</span><button class="iconbtn" aria-label="Remove technician" onclick="delTech('+i+')">'+TRASH_SVG+'</button></div>';}).join('');
   }else{
     h+='<p class="mut">No technicians listed yet.</p>';
   }
-  h+='<div class="row" style="margin-top:8px"><input id="tech_name" placeholder="Tech name" style="flex:1">'
-    +'<button class="btn grn" onclick="addTech()">Add</button></div></div>';
-  return h;}
+  if(techFormOpen){
+    h+='<div class="row" style="margin-top:8px"><input id="tech_name" placeholder="Tech name" style="flex:1">'
+      +'<button class="btn grn" onclick="addTech()">Add</button></div>';
+  }
+  return h+'</div>';}
+function toggleTechForm(){techFormOpen=!techFormOpen;render();}
 function addTech(){
   var p=projById(view.id);if(!p)return;
   var name=val('tech_name');if(!name){toast('Enter a name');return;}
@@ -1092,6 +1121,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'2.9.6',items:['Module toggles moved into a gear dialog in the Details card','Technicians card: shorter title, + button to add, trash icon to remove']},
  {v:'2.9.5',items:['About page shows only the last 4 changelog entries']},
  {v:'2.9.4',items:['Swipe-back now walks through app screens instead of closing the app','Refresh/reopen picks up where you left off']},
  {v:'2.9.3',items:['Fixed: active tab no longer renders as a blue pill hiding the icon (CSS class collision)']},

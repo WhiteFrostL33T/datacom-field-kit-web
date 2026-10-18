@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v2.9.5
+**Current version:** v2.9.6
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,10 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v2.9.6** — module toggles moved into a gear dialog in the Details
+  card; Technicians card: shorter title, + button to add, trash icon
+  to remove.
 
 - **v2.9.5** — About page shows only the last 4 changelog entries.
 
