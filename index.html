@@ -204,7 +204,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.1';
+var APP_VERSION='3.0.2';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1145,6 +1145,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.2',items:['Fixed sync 403 on projects: edits now use explicit UPDATE instead of upsert (Postgres re-checks the INSERT policy on upsert, failing when owner_id is omitted)']},
  {v:'3.0.1',items:['Fixed: first sync failed when projects had technicians or calculator data (child rows now push after their project)','Sync errors now show the actual reason']},
  {v:'3.0',items:['Sign in with your Field Kit account','Projects sync across devices in real time','Invite teammates to a project','Works offline — changes sync when you reconnect']},
  {v:'2.9.7',items:['Export moved into the card \u22ee menu','New module icons: cable spool, patch panel, ethernet port']},
@@ -1465,6 +1466,10 @@ function pushChanges(){
   function upsert(table,row){
     return sb.from(table).upsert(row,{onConflict:'id'}).then(function(r){ if(r.error) throw r.error; });
   }
+  function updateRow(table,id,row){
+    var o={}; for(var k in row) if(k!=='id') o[k]=row[k];
+    return sb.from(table).update(o).eq('id',id).then(function(r){ if(r.error) throw r.error; });
+  }
   function softDel(table,id){
     return sb.from(table).update({deleted_at:new Date().toISOString()}).eq('id',id)
       .then(function(r){ if(r.error) throw r.error; });
@@ -1474,7 +1479,14 @@ function pushChanges(){
     var d=diffArrays(data[cfg.key]||[],snap[cfg.key]||[]);
     var snapById={}; (snap[cfg.key]||[]).forEach(function(r){ if(r&&r.id) snapById[r.id]=1; });
     var jobs=[];
-    d.added.concat(d.changed).forEach(function(r){ jobs.push(upsert(cfg.table,toDB(cfg.table,r,!snapById[r.id]))); });
+    d.added.forEach(function(r){ jobs.push(upsert(cfg.table,toDB(cfg.table,r,true))); });
+    d.changed.forEach(function(r){
+      // explicit UPDATE: ownership is set at insert and never touched here.
+      // (upsert would re-run the INSERT RLS check against a row without owner_id -> 403)
+      var row=toDB(cfg.table,r,false);
+      delete row.owner_id;
+      jobs.push(updateRow(cfg.table,r.id,row));
+    });
     d.removed.forEach(function(r){ jobs.push(softDel(cfg.table,r.id)); });
     return Promise.all(jobs);
   }
