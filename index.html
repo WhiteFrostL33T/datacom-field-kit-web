@@ -34,7 +34,7 @@ header .ttl{font-size:1.15rem;font-weight:700;flex:1;letter-spacing:.2px;}
 header .ttl small{display:block;font-size:.72rem;font-weight:400;color:#bcd2e8;}
 .hbtn{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);color:#fff;
   border-radius:10px;padding:9px 13px;font-size:.9rem;cursor:pointer;min-height:44px;}
-main{padding:14px 12px 90px;max-width:860px;margin:0 auto;}
+main{padding:14px 12px 150px;max-width:860px;margin:0 auto;}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
   padding:14px;margin:0 0 12px;}
 .card h3{margin:0 0 6px;font-size:1.05rem;}
@@ -80,11 +80,27 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
   padding:10px 14px;display:none;font-size:.95rem;}
 #timerbar.show{display:flex;align-items:center;gap:10px;}
 #timerbar .el{font-weight:700;font-variant-numeric:tabular-nums;}
-#toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:#222f3f;
+#toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#222f3f;
   border:1px solid var(--line);color:var(--text);padding:11px 18px;border-radius:999px;
   font-size:.9rem;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:92vw;text-align:center;}
-.appfoot{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--brand);
-color:#bcd2e8;text-align:center;font-size:.68rem;padding:8px 10px;letter-spacing:.3px;}
+#tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--panel);
+  border-top:1px solid var(--line);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom));}
+.tab{flex:1;background:none;border:none;color:var(--muted);font-size:.72rem;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;min-height:58px;border-radius:10px;}
+.tab svg{width:24px;height:24px;}
+.tab.act{color:#fff;}
+.tab.act svg{stroke:var(--accent);}
+.seclbl{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px;}
+.bigtime{font-size:2.4rem;font-weight:800;text-align:center;letter-spacing:2px;margin:8px 0 12px;font-variant-numeric:tabular-nums;}
+.ver{display:inline-block;background:var(--chip);border:1px solid var(--line);color:#9fc3e8;
+  border-radius:999px;padding:4px 14px;font-size:.85rem;margin:6px 0;}
+.feeditem{display:flex;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line);align-items:flex-start;}
+.feeditem:last-child{border-bottom:none;}
+.fic{width:40px;height:40px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--chip);}
+.fic svg{width:20px;height:20px;stroke:var(--accent);}
+.fib{flex:1;min-width:0;}
+.fib b{font-size:.92rem;}
+.ftime{color:var(--muted);font-size:.76rem;white-space:nowrap;flex:0 0 auto;}
 #toast.show{opacity:1;}
 .big{font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums;}
 .proj-head{display:flex;align-items:flex-start;gap:10px;}
@@ -96,7 +112,7 @@ color:#bcd2e8;text-align:center;font-size:.68rem;padding:8px 10px;letter-spacing
   padding:11px 6px;cursor:pointer;min-height:48px;font-size:.9rem;}
 .seg button.act{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;}
 .preset{flex:0 0 auto !important;min-width:0;}
-.fab{position:fixed;right:18px;bottom:54px;width:62px;height:62px;border-radius:50%;
+.fab{position:fixed;right:18px;bottom:96px;width:62px;height:62px;border-radius:50%;
   background:var(--accent);color:#fff;font-size:30px;line-height:1;border:none;z-index:40;
   box-shadow:0 4px 16px rgba(0,0,0,.5);cursor:pointer;}
 .projcard{cursor:pointer;}
@@ -121,15 +137,13 @@ color:#bcd2e8;text-align:center;font-size:.68rem;padding:8px 10px;letter-spacing
 <body>
 <header>
   <div class="ttl" style="display:flex;align-items:center;gap:10px"><img src="logo.png" alt="" style="width:38px;height:38px;border-radius:9px;flex:0 0 auto"><div>Datacom Field Kit<small id="hdrsub">Projects</small></div></div>
-  <button class="hbtn" id="btnHome">Projects</button>
-  <button class="hbtn" id="btnBackup">Backup</button>
   <div class="hdrmenu"><button class="hbtn" id="btnMore" aria-label="More options">&#8942;</button>
-    <div class="cmenu" id="hdrMenu" style="display:none"><button onclick="openImportForm()">Import project</button></div></div>
+    <div class="cmenu" id="hdrMenu" style="display:none"><button onclick="openImportForm()">Import project</button><button onclick="goBackup()">Backup / Restore</button><button onclick="goAbout()">About</button></div></div>
 </header>
 <div id="timerbar"></div>
 <main id="app"></main>
 <div id="toast"></div>
-<footer class="appfoot" id="appfoot">&copy; 2026 Jeremy Ashley &middot; Field Kit Web</footer>
+<nav id="tabbar"></nav>
 
 <script>
 "use strict";
@@ -161,7 +175,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='2.9';
+var APP_VERSION='2.9.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -220,11 +234,12 @@ function fallbackCopy(text){var ta=document.createElement('textarea');ta.value=t
 var view={name:'projects'};
 var curTab='overview';
 function goProjects(){view={name:'projects'};render();}
+function goTimer(){view={name:'timer'};render();}
+function goDashboard(){view={name:'dashboard'};render();}
 function goBackup(){view={name:'backup'};render();}
+function goAbout(){view={name:'about'};render();}
 function openProject(id){view={name:'project',id:id};curTab='overview';render();}
 function setTab(t){curTab=t;render();}
-$('btnHome').addEventListener('click',goProjects);
-$('btnBackup').addEventListener('click',goBackup);
 $('btnMore').addEventListener('click',function(e){e.stopPropagation();toggleHdrMenu();});
 document.addEventListener('click',function(){var m=$('hdrMenu');if(m)m.style.display='none';});
 function toggleHdrMenu(){var m=$('hdrMenu');m.style.display=m.style.display==='none'?'block':'none';}
@@ -232,14 +247,31 @@ function openImportForm(){
   if(view.name!=='projects')goProjects();
   var f=$('importForm');if(f&&f.style.display==='none')toggleImportForm();
   window.scrollTo(0,0);}
+var TABDEF=[
+ {id:'projects',label:'Projects',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>'},
+ {id:'timer',label:'Timer',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>'},
+ {id:'dashboard',label:'Dashboard',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>'}];
+function renderTabBar(){
+  var active=view.name==='project'?'projects':(view.name==='backup'||view.name==='about'?null:view.name);
+  $('tabbar').innerHTML=TABDEF.map(function(t){
+    return '<button class="tab'+(active===t.id?' act':'')+'" onclick="go'+t.label+'()">'+t.icon+'<span>'+t.label+'</span></button>';
+  }).join('');
+}
 function render(){
   $('hdrsub').textContent=view.name==='projects'?'Projects':
+    view.name==='timer'?'Timer':
+    view.name==='dashboard'?'Dashboard':
     view.name==='backup'?'Backup / Restore':
+    view.name==='about'?'About':
     (projById(view.id)?projById(view.id).name:'Project');
   renderTimerBar();
   if(view.name==='projects')renderProjects();
+  else if(view.name==='timer')renderTimer();
+  else if(view.name==='dashboard')renderDashboard();
   else if(view.name==='backup')renderBackup();
+  else if(view.name==='about')renderAbout();
   else renderProject();
+  renderTabBar();
 }
 /* ============ timer ============ */
 var timerInt=null;
@@ -256,8 +288,35 @@ function renderTimerBar(){
     bar.innerHTML='<span>Timer running — <b>'+esc(data.timer.kind)+'</b> · '+
       esc(p?p.name:'(project deleted)')+'</span><span class="el">'+pad(h)+':'+pad(m)+':'+pad(s)+'</span>'+
       '<button class="hbtn" style="margin-left:auto" onclick="stopTimer()">Stop</button>';
+    var te=$('tabTimerElapsed');if(te)te.textContent=pad(h)+':'+pad(m)+':'+pad(s);
   }
   draw();timerInt=setInterval(draw,1000);
+}
+var qsKind='On site';
+function setQsKind(k,el){qsKind=k;var bs=el.parentNode.querySelectorAll('button');
+  for(var i=0;i<bs.length;i++)bs[i].className=bs[i].textContent===k?'act':'';}
+function quickStartTimer(){
+  var pid=val('qs_proj');if(!pid){toast('Choose a project');return;}
+  startTimer(pid,qsKind);}
+function renderTimer(){
+  var h='';
+  if(data.timer){
+    var p=projById(data.timer.projectId);
+    var st=new Date(data.timer.startISO);
+    h+='<div class="card"><div class="toprow"><div class="grow"><h3>'+esc(p?p.name:'(project deleted)')+'</h3>'
+      +'<div class="mut">'+esc(data.timer.kind)+' \u00b7 started '+esc(st.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))+'</div></div></div>'
+      +'<div class="bigtime" id="tabTimerElapsed">--:--:--</div>'
+      +'<button class="btn red" onclick="stopTimer()">Stop</button></div>';
+  }
+  var projs=data.projects.filter(function(x){return x.status!=='done';});
+  h+='<div class="card"><h3>Quick start</h3>'
+    +'<label>Project</label><select id="qs_proj">'
+    +projs.map(function(x){return '<option value="'+x.id+'">'+esc(x.name)+'</option>';}).join('')+'</select>'
+    +'<label>Kind</label><div class="seg">'
+    +KINDS.map(function(k){return '<button type="button" class="'+(k===qsKind?'act':'')+'" onclick="setQsKind(\''+k+'\',this)">'+k+'</button>';}).join('')
+    +'</div><button class="btn grn" onclick="quickStartTimer()">Start timer</button></div>';
+  if(!projs.length)h='<div class="card"><p class="mut">No active projects. Create one on the Projects tab first.</p></div>';
+  $('app').innerHTML=h;
 }
 function startTimer(pid,kind){
   if(data.timer){toast('A timer is already running — stop it first');return;}
@@ -632,7 +691,7 @@ function addPull(){
     else{used=FK.cableUsed(marking,null,size);if(used<=0)err='Used footage must be more than 0 — check the marking.';}
   }
   if(err){$('cp_err').innerHTML='<div class="err">'+esc(err)+'</div>';return;}
-  data.pulls.push({id:uid(),projectId:view.id,run:val('cp_run'),box:val('cp_box')||'Box 1',
+  data.pulls.push({id:uid(),projectId:view.id,createdAt:Date.now(),run:val('cp_run'),box:val('cp_box')||'Box 1',
     boxSize:size,mode:pullMode,prev:prev,newest:newest,marking:marking,used:used,date:todayStr()});
   save();render();toast('Pull added — '+used+' ft');}
 function delPull(id){if(!confirm('Delete this pull?'))return;
@@ -959,7 +1018,7 @@ function saveMaterial(){
   if(!isFinite(qty)||qty<=0){toast('Enter a quantity above 0');return;}
   if(matEditId){var m=data.materials.filter(function(x){return x.id===matEditId})[0];
     if(m){m.name=name;m.qty=qty;m.unit=val('mt_unit');m.notes=val('mt_notes');}matEditId=null;}
-  else data.materials.push({id:uid(),projectId:view.id,name:name,qty:qty,
+  else data.materials.push({id:uid(),projectId:view.id,createdAt:Date.now(),name:name,qty:qty,
     unit:val('mt_unit'),notes:val('mt_notes')});
   learnMatPick(name,val('mt_unit'));
   save();render();toast('Material saved');}
@@ -968,6 +1027,71 @@ function editMaterial(id){var m=data.materials.filter(function(x){return x.id===
   $('mt_unit').value=m.unit;$('mt_notes').value=m.notes||'';window.scrollTo(0,0);}
 function delMaterial(id){if(!confirm('Delete this material line?'))return;
   data.materials=data.materials.filter(function(x){return x.id!==id;});save();render();}
+/* ============ DASHBOARD ============ */
+function fmtFeedTime(t){return new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}
+function fmtFeedDate(t){return new Date(t).toLocaleDateString([],{month:'numeric',day:'numeric'});}
+function feedItem(it){
+  var icons={
+    time:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+    pull:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 17c4-6 12-6 16 0M4 7c4 6 12 6 16 0"/></svg>',
+    mat:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8"/></svg>'};
+  var p=projById(it.e.projectId);var pn=p?p.name:'(deleted project)';
+  var title='',sub=pn,when='';
+  if(it.type==='time'){
+    title=it.e.kind+' \u00b7 '+fmtHM(entryMinutes(it.e));
+    if(it.e.notes)sub+=' \u00b7 '+it.e.notes;
+    when=it.t?fmtFeedTime(it.t):'';
+  }else if(it.type==='pull'){
+    title=it.e.run+' \u00b7 '+it.e.used+' ft';
+    if(it.e.box)sub+=' \u00b7 '+it.e.box;
+    when=it.e.date||'';
+  }else{
+    title=it.e.qty+' \u00d7 '+it.e.name;
+    if(it.e.notes)sub+=' \u00b7 '+it.e.notes;
+    when=it.t?fmtFeedDate(it.t):'';
+  }
+  return '<div class="feeditem"><div class="fic">'+icons[it.type]+'</div>'
+    +'<div class="fib"><b>'+esc(title)+'</b><div class="mut">'+esc(sub)+'</div></div>'
+    +'<div class="ftime">'+esc(when)+'</div></div>';
+}
+function renderDashboard(){
+  var ev=[];
+  data.timeEntries.forEach(function(e){
+    var t=new Date(e.startISO).getTime();if(!isFinite(t))t=0;
+    ev.push({t:t,type:'time',e:e});});
+  data.pulls.forEach(function(p){
+    var t=p.createdAt||(p.date?new Date(p.date+'T12:00:00').getTime():0);if(!isFinite(t))t=0;
+    ev.push({t:t,type:'pull',e:p});});
+  data.materials.forEach(function(m){ev.push({t:m.createdAt||0,type:'mat',e:m});});
+  ev.sort(function(a,b){return b.t-a.t;});
+  ev=ev.slice(0,40);
+  var h='<div class="card"><h3>Recent activity</h3>';
+  if(!ev.length)h+='<p class="mut">Nothing yet \u2014 log time, cable or materials and it will show up here.</p>';
+  var lastDay='',now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  ev.forEach(function(it){
+    var d=new Date(it.t),day=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
+    var lbl=day===today?'Today':day===today-864e5?'Yesterday':'Earlier';
+    if(lbl!==lastDay){h+='<div class="seclbl">'+lbl+'</div>';lastDay=lbl;}
+    h+=feedItem(it);});
+  h+='</div>';
+  $('app').innerHTML=h;
+}
+/* ============ ABOUT ============ */
+var CHANGELOG=[
+ {v:'2.9.1',items:['Bottom tab bar: Projects, Timer, Dashboard','Timer tab with quick-start and live timer','Dashboard activity feed across all projects','Backup, Import and About in the header menu']},
+ {v:'2.9',items:['Tappable project cards \u2014 no more Open button','Delete moved into a per-card menu','+ New Project is now a floating button','Import moved to the header menu']},
+ {v:'2.8',items:['Fixed: backup/restore and materials restored after the v2.7 regression']},
+ {v:'2.7',items:['Connectwise Notes: time, cable and materials in one export','Notes box auto-expands, no scrolling']}];
+function renderAbout(){
+  var h='<div class="card"><h3>Field Kit Web</h3><span class="ver">v'+APP_VERSION+'</span>'
+    +'<p class="mut">Jeremy\u2019s field toolkit for MHS Enterprises site work.</p>'
+    +'<div class="seclbl">What\u2019s new</div>'
+    +CHANGELOG.map(function(c){
+      return '<h4 style="margin:12px 0 4px">v'+c.v+'</h4><ul style="margin:0 0 8px;padding-left:20px;color:var(--muted);font-size:.9rem;line-height:1.65">'
+        +c.items.map(function(i){return '<li>'+esc(i)+'</li>';}).join('')+'</ul>';}).join('')
+    +'</div>';
+  $('app').innerHTML=h;
+}
 /* ============ BACKUP VIEW ============ */
 function renderBackup(){
   $('app').innerHTML='<div class="card"><h3>Export backup</h3>'
@@ -992,7 +1116,6 @@ function importBackup(){
   };
   r.readAsText(f);}
 /* ============ init ============ */
-(function(){var f=document.getElementById('appfoot');if(f)f.innerHTML+=' &middot; v'+APP_VERSION;})();
 render();
 </script>
 </body>
