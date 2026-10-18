@@ -204,7 +204,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.2';
+var APP_VERSION='3.0.3';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1145,6 +1145,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.3',items:['New \u22ee menu item: Sync diagnostics (shows sign-in, token match, project ownership)','Fixed: a background pull could mark failed uploads as synced']},
  {v:'3.0.2',items:['Fixed sync 403 on projects: edits now use explicit UPDATE instead of upsert (Postgres re-checks the INSERT policy on upsert, failing when owner_id is omitted)']},
  {v:'3.0.1',items:['Fixed: first sync failed when projects had technicians or calculator data (child rows now push after their project)','Sync errors now show the actual reason']},
  {v:'3.0',items:['Sign in with your Field Kit account','Projects sync across devices in real time','Invite teammates to a project','Works offline — changes sync when you reconnect']},
@@ -1661,14 +1662,62 @@ function queuePull(){
     merging=true;
     pullChanges().then(function(changed){
       try{
-        if(changed){
-          lastSynced=syncableSnapshot();
-          saveSyncMeta(); save(); render();
-          toast('Updated from another device');
-        }
+        // NOTE: lastSynced is intentionally NOT updated here — only a successful
+        // push+pull in syncNow may advance it, otherwise failed pushes would
+        // look synced and never be retried.
+        if(changed){ save(); render(); toast('Updated from another device'); }
       }finally{ merging=false; }
     }).catch(function(){ merging=false; });
   },1500);
+}
+
+/* ---------- diagnostics ---------- */
+function jwtSub(){
+  try{
+    var s=localStorage.getItem('sb-dsmgmkstxdfohwoujkkw-auth-token');
+    if(!s) return '(no stored session)';
+    var tok=JSON.parse(s).access_token;
+    if(!tok) return '(no access token)';
+    var b=tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    return JSON.parse(atob(b)).sub||'(no sub)';
+  }catch(e){ return '(decode failed)'; }
+}
+function shortId(id){ return id?String(id).slice(0,8)+'…':'(none)'; }
+function openDiag(){
+  toggleHdrMenu();
+  closeDiag();
+  var ov=document.createElement('div');
+  ov.className='dlg-ov'; ov.id='diagDlg';
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Sync diagnostics</h3></div>'
+    +'<div id="diag_body"><p class="mut">Checking…</p></div>'
+    +'<button class="btn sec" style="width:100%;margin-top:12px" onclick="closeDiag()">Close</button></div>';
+  ov.addEventListener('click',function(e){ if(e.target===ov) closeDiag(); });
+  document.body.appendChild(ov);
+  runDiag();
+}
+function closeDiag(){ var o=document.getElementById('diagDlg'); if(o) o.remove(); }
+function runDiag(){
+  var box=document.getElementById('diag_body'); if(!box||!sb||!sbUser) return;
+  var sub=jwtSub(), uid=sbUser.id;
+  var h='<div class="kv"><span>Signed in as</span><b>'+esc(sbUser.email)+'</b></div>'
+    +'<div class="kv"><span>User ID</span><b>'+esc(shortId(uid))+'</b></div>'
+    +'<div class="kv"><span>Token user</span><b>'+esc(shortId(sub))+(sub===uid?' \u2713 match':' \u2717 MISMATCH')+'</b></div>'
+    +'<div class="seclbl">Local projects ('+(data.projects||[]).length+')</div>';
+  (data.projects||[]).forEach(function(p){
+    var mine=!p.owner_id||p.owner_id===uid;
+    h+='<div class="kv"><span>'+esc(p.name)+'</span><b>'+esc(shortId(p.owner_id))+(mine?'':' \u2717 NOT YOURS')+'</b></div>';
+  });
+  h+='<div class="seclbl">Server projects</div><div id="diag_srv"><p class="mut">Loading…</p></div>';
+  box.innerHTML=h;
+  sb.from('projects').select('id,name,owner_id').limit(50).then(function(r){
+    var el=document.getElementById('diag_srv'); if(!el) return;
+    if(r.error){ el.innerHTML='<div class="err">'+esc(r.error.message)+'</div>'; return; }
+    var rows=r.data||[], hh='<div class="kv"><span>Visible to you</span><b>'+rows.length+'</b></div>';
+    rows.forEach(function(row){
+      hh+='<div class="kv"><span>'+esc(row.name)+'</span><b>'+esc(shortId(row.owner_id))+(row.owner_id===uid?'':' \u2717')+'</b></div>';
+    });
+    el.innerHTML=hh;
+  });
 }
 
 /* ---------- header menu / sharing ---------- */
@@ -1686,6 +1735,7 @@ function renderHdrMenu(){
     +'<button onclick="goAbout()">About</button>';
   if(sbReady&&sbUser){
     h+='<div class="mut" id="syncstat" style="padding:10px 12px 2px;font-size:.78rem">'+esc(syncStatusText())+'</div>'
+      +'<button onclick="openDiag()">Sync diagnostics</button>'
       +'<button onclick="syncNow(true)">Sync now</button>'
       +'<button onclick="doSignOut()">Sign out</button>';
   }
