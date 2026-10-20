@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.7';
+var APP_VERSION='3.0.8';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1198,6 +1198,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.8',items:['Fixed: Share picker checkboxes rendered full-width above each email \u2014 now inline beside it']},
  {v:'3.0.7',items:['Fixed: Copy buttons in \u201cCopy a single entry\u201d stretched to full row height \u2014 now compact']},
  {v:'3.0.6',items:['Share project: pick people from a list with checkboxes instead of typing emails','Ticket shows as CW # next to the project name everywhere (cards, timer, dashboard, export)','Connectwise Notes: copy a single time entry (project header + that entry) for split days']},
  {v:'3.0.5',items:['Technicians card now reflects project membership: owner + invited members (badged), hand-typed names kept as read-only legacy rows; manual add/remove removed \u2014 members are managed via \u22ee \u2192 Share project']},
@@ -1869,7 +1870,7 @@ function loadInviteList(memberIds,ownerId){
       return u.id!==sbUser.id&&u.id!==ownerId&&memberIds.indexOf(u.id)<0;});
     if(!users.length){ box.innerHTML='<p class="mut">Everyone already has access.</p>'; updateInviteBtn(); return; }
     box.innerHTML=users.map(function(u){
-      return '<label class="kv" style="cursor:pointer"><span><input type="checkbox"'+(shareSel[u.id]?' checked':'')+' onchange="toggleShareSel(\''+u.id+'\',this.checked)" style="margin-right:10px;transform:scale(1.25)">'+esc(u.email||'')+'</span></label>';
+      return '<label class="kv" style="cursor:pointer;align-items:center"><span style="display:flex;align-items:center;gap:10px"><input type="checkbox"'+(shareSel[u.id]?' checked':'')+' onchange="toggleShareSel(\''+u.id+'\',this.checked)" style="width:22px;height:22px;margin:0;padding:0;flex:0 0 auto;accent-color:#2f7fc4">'+esc(u.email||'')+'</span></label>';
     }).join('');
     updateInviteBtn();
   });
