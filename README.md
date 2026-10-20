@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v3.0.16
+**Current version:** v3.0.17
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,9 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v3.0.17** — Fixed sync: projects stuck only on a device (never
+  uploaded) now heal themselves and upload instead of failing every sync.
 
 - **v3.0.16** — Connectwise Notes: copying a single entry now includes
   the day's materials on the last "On site" entry (also shown in the list).

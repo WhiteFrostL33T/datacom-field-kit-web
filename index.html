@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.16';
+var APP_VERSION='3.0.17';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1248,6 +1248,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.17',items:['Fixed sync: projects stuck only on a device (never uploaded) now heal themselves and upload instead of failing every sync']},
  {v:'3.0.16',items:['Connectwise Notes: copying a single entry now includes the day\u2019s materials on the last \u201cOn site\u201d entry (also shown in the list)']},
  {v:'3.0.15',items:['Fixed: removing a shared project on your device now leaves it instead of deleting it for the owner; re-inviting a member works again']},
  {v:'3.0.14',items:['Fixed (iOS): header no longer slides under the notch / status bar (safe-area padding)']},
@@ -1589,10 +1590,49 @@ function leftProjectIds(snap){
   });
   return left;
 }
+function reconcileSnapshot(base){
+  // Self-heal "phantom" projects: rows the snapshot believes are synced
+  // but that do not exist on the server (their child rows then fail RLS
+  // forever and wedge the whole sync). Own phantoms are evicted from the
+  // snapshot so they and their records re-upload; other people's phantoms
+  // are flagged so their rows get skipped instead of wedging the push.
+  if(!sb||!sbUser||!base||!(base.projects||[]).length) return Promise.resolve(base);
+  return sb.from('projects').select('id').then(function(r){
+    if(r.error||!r.data) return base;
+    var server={}; r.data.forEach(function(x){ server[x.id]=1; });
+    var localById={}; (data.projects||[]).forEach(function(p){ localById[p.id]=p; });
+    var own={}, ghost={};
+    (base.projects||[]).forEach(function(p){
+      if(!p||server[p.id]||!localById[p.id]) return;
+      if(!p.owner_id||p.owner_id===sbUser.id) own[p.id]=1; else ghost[p.id]=1;
+    });
+    if(!Object.keys(own).length&&!Object.keys(ghost).length) return base;
+    var snap=JSON.parse(JSON.stringify(base));
+    var sw={};
+    (snap.poeSwitches||[]).concat(snap.portSwitches||[]).forEach(function(s){ if(own[s.projectId]) sw[s.id]=1; });
+    snap.projects=(snap.projects||[]).filter(function(p){ return !own[p.id]; });
+    ['timeEntries','pulls','materials','ipAssignments','poeSwitches','portSwitches'].forEach(function(k){
+      snap[k]=(snap[k]||[]).filter(function(x){ return !own[x.projectId]; });
+    });
+    ['poeDevices','portEntries'].forEach(function(k){
+      snap[k]=(snap[k]||[]).filter(function(x){ return !sw[x.switchId]; });
+    });
+    Object.keys(own).forEach(function(pid){
+      if(snap.techNames) delete snap.techNames[pid];
+      if(snap.settings) delete snap.settings[pid];
+    });
+    snap.__ghostIds=ghost;
+    return snap;
+  },function(){ return base; });
+}
 function pushChanges(){
   if(!sb||!sbUser) return Promise.resolve();
-  var snap=lastSynced||emptySnapshot();
+  var base=lastSynced||emptySnapshot();
+  return reconcileSnapshot(base).then(function(snap){ return pushChangesDiff(snap); });
+}
+function pushChangesDiff(snap){
   var leftIds=leftProjectIds(snap);
+  if(snap.__ghostIds) for(var g in snap.__ghostIds) leftIds[g]=1;
   var leftSwitches={};
   (snap.poeSwitches||[]).concat(snap.portSwitches||[]).forEach(function(s){
     if(s&&leftIds[s.projectId]) leftSwitches[s.id]=1;
@@ -1617,6 +1657,7 @@ function pushChanges(){
     var snapById={}; (snap[cfg.key]||[]).forEach(function(r){ if(r&&r.id) snapById[r.id]=1; });
     var jobs=[];
     d.added.forEach(function(r){
+      if(cfg.table!=='projects'&&((r.projectId&&leftIds[r.projectId])||(r.switchId&&leftSwitches[r.switchId]))) return;
       if(cfg.table==='projects'){
         // NEVER upsert projects: ON CONFLICT DO UPDATE fails RLS for new rows
         // because the UPDATE check is_project_member(id) is false until the row
@@ -1634,6 +1675,7 @@ function pushChanges(){
       }
     });
     d.changed.forEach(function(r){
+      if(cfg.table!=='projects'&&((r.projectId&&leftIds[r.projectId])||(r.switchId&&leftSwitches[r.switchId]))) return;
       // explicit UPDATE: ownership is set at insert and never touched here.
       // (upsert would re-run the INSERT RLS check against a row without owner_id -> 403)
       var row=toDB(cfg.table,r,false);
