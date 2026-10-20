@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.10';
+var APP_VERSION='3.0.11';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -266,7 +266,7 @@ function fallbackCopy(text){var ta=document.createElement('textarea');ta.value=t
 /* ============ routing ============ */
 var view={name:'projects'};
 var curTab='overview';
-function goProjects(){view={name:'projects'};render();}
+function goProjects(){projTab='active';view={name:'projects'};render();}
 function goTimer(){view={name:'timer'};render();}
 function goDashboard(){view={name:'dashboard'};render();}
 function goBackup(){view={name:'backup'};render();}
@@ -400,6 +400,8 @@ function stopTimer(){
 
 <script>
 /* ============ PROJECTS LIST ============ */
+var projTab='active';
+function setProjTab(t){projTab=t;renderProjects();}
 function renderProjects(){
   var h='<div id="projForm" style="display:none"><div class="card"><h3>New project</h3>'
     +'<label>Project name *</label><input id="np_name" placeholder="e.g. Lobby camera install">'
@@ -416,15 +418,33 @@ function renderProjects(){
     +'<input id="ip_file" type="file" accept=".json,.txt,application/json,text/plain">'
     +'<button class="btn sec" onclick="importProjectFile()">Import project</button>'
     +'<div id="ip_msg"></div></div></div>';
-  data.projects.slice().sort(function(a,b){return ((a.status==='done')-(b.status==='done'))||((b.createdAt||0)-(a.createdAt||0));})
-  .forEach(function(p){
+  var shown=[];
+  if(data.projects.length){
+    var nA=data.projects.filter(function(p){return (p.status||'active')!=='done';}).length;
+    var nD=data.projects.length-nA;
+    var tabBtn=function(t,label,n,fill,txt){
+      var on=projTab===t;
+      return '<button onclick="setProjTab(\''+t+'\')" style="flex:1;padding:11px;border-radius:10px;cursor:pointer;font-weight:600;'
+        +'border:1px solid '+(on?fill:'var(--line)')+';background:'+(on?fill:'var(--chip)')+';color:'+(on?'#e8f0f8':txt)+'">'
+        +label+' ('+n+')</button>';};
+    h+='<div style="display:flex;gap:6px;margin-top:12px">'
+      +tabBtn('active','Active',nA,'#1a5c3c','#56d69e')
+      +tabBtn('done','Done',nD,'#7a2828','#f87171')
+      +'</div>';
+    shown=data.projects.filter(function(p){return ((p.status||'active')==='done')===(projTab==='done');})
+      .sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+    if(!shown.length)
+      h+='<div class="card" style="margin-top:12px"><p class="mut">'
+        +(projTab==='done'?'No done projects yet.':'No active projects.')+'</p></div>';
+  }
+  shown.forEach(function(p){
     var mods=enabledMods(p);
+    var done=(p.status||'active')==='done';
     h+='<div class="card projcard" onclick="openProject(\''+p.id+'\')"><div class="proj-head"><div class="grow"><h3>'+esc(p.name)+cwTag(p)+'</h3>'
-      +'<div class="mut">'+esc(p.customer||'')+(p.customer&&p.site?' · ':'')+esc(p.site||'')
-      +'<br>Status: '+esc(p.status||'active')+'</div></div>'
+      +'<div class="mut">'+esc(p.customer||'')+(p.customer&&p.site?' · ':'')+esc(p.site||'')+'</div></div>'
       +'<div class="cardmenu"><button class="iconbtn" aria-label="Project actions" onclick="event.stopPropagation();toggleCardMenu(\''+p.id+'\')">&#8942;</button>'
       +'<div class="cmenu" id="cmenu-'+p.id+'" style="display:none"><button onclick="event.stopPropagation();exportProject(\''+p.id+'\')">Export</button><button class="danger" onclick="event.stopPropagation();delProject(\''+p.id+'\')">Delete</button></div></div></div>'
-      +'<div style="margin:8px 0">'+mods.map(function(m){
+      +'<div style="margin:8px 0"><span style="margin-right:6px">'+tbadge(done?'done':'active',done?'#a33333':'#1e7a46')+'</span>'+mods.map(function(m){
           var lbl=MODULES.filter(function(x){return x[0]===m;})[0];
           return '<span class="chip on">'+esc(lbl?lbl[1]:m)+'</span>';}).join('')+'</div>'
       +'<div class="row"><div class="card" style="background:var(--panel2);margin:0;padding:10px;text-align:center">'
@@ -1203,6 +1223,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.11',items:['Projects view: Active / Done tabs with counts; status is now a colored pill on each card (green active, red done)']},
  {v:'3.0.10',items:['Time entries now snap start and end to the nearest 15 minutes (timer and manual entries); 15-minute minimum']},
  {v:'3.0.9',items:['Fixed: Copy buttons in \u201cCopy a single entry\u201d squeezed the entry text \u2014 buttons now use the compact inline style']},
  {v:'3.0.8',items:['Fixed: Share picker checkboxes rendered full-width above each email \u2014 now inline beside it']},
