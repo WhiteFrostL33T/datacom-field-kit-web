@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.9';
+var APP_VERSION='3.0.10';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -379,15 +379,20 @@ function startTimer(pid,kind){
   if(data.timer){toast('A timer is already running — stop it first');return;}
   data.timer={projectId:pid,kind:kind,startISO:new Date().toISOString()};save();render();
   toast('Timer started ('+kind+')');}
+function snap15(d){ return new Date(Math.round(d.getTime()/900000)*900000); }
+function snapRange(start,end){
+  var s=snap15(start),e=snap15(end);
+  if(e<=s)e=new Date(s.getTime()+15*60000);
+  return [s,e];}
+function fmtClock(d){ return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}); }
 function stopTimer(){
   if(!data.timer)return;
-  var end=new Date();
-  var start=new Date(data.timer.startISO);
-  var mins=Math.max(15,Math.ceil((end-start)/60000/15)*15);
-  var rend=new Date(start.getTime()+mins*60000);
+  var r=snapRange(new Date(data.timer.startISO),new Date());
+  var mins=Math.round((r[1]-r[0])/60000);
   data.timeEntries.push({id:uid(),projectId:data.timer.projectId,kind:data.timer.kind,
-    startISO:toLocalInput(start),endISO:toLocalInput(rend),notes:'',source:'timer'});
-  data.timer=null;save();render();toast('Time entry saved ('+fmtHM(mins)+', rounded to 15 min)');}
+    startISO:toLocalInput(r[0]),endISO:toLocalInput(r[1]),notes:'',source:'timer'});
+  data.timer=null;save();render();
+  toast('Time entry saved ('+fmtHM(mins)+', '+fmtClock(r[0])+'\u2013'+fmtClock(r[1])+')');}
 </script>
 
 <script>
@@ -702,12 +707,14 @@ function saveTimeEntry(){
   if(!d||!s||!e){toast('Date, start and end are required');return;}
   var start=d+'T'+s,end=d+'T'+e;
   if(new Date(end)<=new Date(start)){toast('End must be after start');return;}
+  var sr=snapRange(new Date(start),new Date(end));
+  start=toLocalInput(sr[0]);end=toLocalInput(sr[1]);
   var kind=segVal('teSeg'),notes=val('te_notes');
   if(teEditId){var en=data.timeEntries.filter(function(x){return x.id===teEditId;})[0];
     if(en){en.startISO=start;en.endISO=end;en.kind=kind;en.notes=notes;}teEditId=null;}
   else data.timeEntries.push({id:uid(),projectId:view.id,kind:kind,startISO:start,endISO:end,
     notes:notes,source:'manual'});
-  save();render();toast('Entry saved');}
+  save();render();toast('Entry saved ('+fmtClock(sr[0])+'\u2013'+fmtClock(sr[1])+')');}
 function editTimeEntry(id){var e=data.timeEntries.filter(function(x){return x.id===id;})[0];if(!e)return;
   teEditId=id;render();
   $('te_date').value=e.startISO.slice(0,10);$('te_start').value=e.startISO.slice(11,16);
@@ -1198,6 +1205,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.10',items:['Time entries now snap start and end to the nearest 15 minutes (timer and manual entries); 15-minute minimum']},
  {v:'3.0.9',items:['Fixed: Copy buttons in \u201cCopy a single entry\u201d squeezed the entry text \u2014 buttons now use the compact inline style']},
  {v:'3.0.8',items:['Fixed: Share picker checkboxes rendered full-width above each email \u2014 now inline beside it']},
  {v:'3.0.7',items:['Fixed: Copy buttons in \u201cCopy a single entry\u201d stretched to full row height \u2014 now compact']},
