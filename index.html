@@ -218,6 +218,9 @@ function defaultData(){return {projects:[],timeEntries:[],timer:null,pulls:[],
 var data;
 try{data=JSON.parse(localStorage.getItem(LS_KEY))||defaultData();}catch(e){data=defaultData();}
 (function(){var d=defaultData();for(var k in d){if(data[k]===undefined)data[k]=d[k];}})();
+(function(){var dirty=false;(data.projects||[]).forEach(function(p){
+  if(p.technicians&&p.technicians.length){p.technicians=[];dirty=true;}});
+  if(dirty){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}catch(e){}}})();
 function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}catch(e){toast('Storage full / unavailable');}queueSync();}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
@@ -614,7 +617,6 @@ function loadMembers(pid,force){
   });
 }
 function techCardHTML(p){
-  var techs=techList(p);
   var mc=memberCache[p.id];
   var h='<div class="card"><div class="cardhd"><h3>Technicians</h3></div>';
   var shown=false;
@@ -625,10 +627,6 @@ function techCardHTML(p){
     });
     shown=true;
   }
-  techs.forEach(function(t){
-    h+='<div class="kv"><span class="mut">'+esc(t)+'</span>'+tbadge('legacy','#3a3f47')+'</div>';
-    shown=true;
-  });
   if(!shown) h+=((sb&&sbUser)?'<p class="mut">Loading members…</p>':'<p class="mut">Sign in to see project members.</p>');
   h+='<p class="mut" style="font-size:.75rem;margin:8px 0 0">Members are managed via \u22ee \u2192 Share project</p>';
   return h+'</div>';}
@@ -1668,8 +1666,7 @@ function pullChanges(){
       byProj[pid].sort(function(a,b){ return tsOf(a.created_at)-tsOf(b.created_at); });
     });
     (data.projects||[]).forEach(function(p){
-      var names=(byProj[p.id]||[]).map(function(t){ return t.name; });
-      if(JSON.stringify(names)!==JSON.stringify(p.technicians||[])){ p.technicians=names; changed=true; }
+      if((p.technicians||[]).length){ p.technicians=[]; changed=true; }
     });
   }));
   jobs.push(sb.from('project_settings').select('*').then(function(r){
