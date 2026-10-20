@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.15';
+var APP_VERSION='3.0.16';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1070,6 +1070,19 @@ function finallogHTML(p){
     +entryCopyListHTML(p)+'</div>';
   return h;
 }
+function dayOfTs(ts){ if(!ts)return ''; var d=new Date(ts);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function matsForEntry(e){
+  // The day's materials ride on the LAST "On site" entry of that day only.
+  if(!e||e.kind!=='On site') return [];
+  var day=e.startISO.slice(0,10);
+  var ons=data.timeEntries.filter(function(x){
+    return x.projectId===e.projectId&&x.kind==='On site'&&x.startISO.slice(0,10)===day;});
+  ons.sort(function(a,b){ return a.endISO<b.endISO?-1:a.endISO>b.endISO?1:((a.createdAt||0)-(b.createdAt||0)); });
+  if(!ons.length||ons[ons.length-1].id!==e.id) return [];
+  return data.materials.filter(function(m){ return m.projectId===e.projectId&&dayOfTs(m.createdAt)===day; });
+}
+function matLine(m){ return m.qty+' x '+m.name+' ('+m.unit+')'+(m.notes?'  \u2014  '+m.notes:''); }
 function entryCopyListHTML(p){
   var entries=data.timeEntries.filter(function(e){return e.projectId===p.id;})
     .sort(function(a,b){return a.startISO<b.startISO?1:-1;});
@@ -1081,8 +1094,11 @@ function entryCopyListHTML(p){
     var dl=d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
     var tl=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+' \u2013 '
       +new Date(e.endISO).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    var mats=matsForEntry(e);
+    var matHtml=mats.length?'<br>'+mats.map(function(m){
+      return '<span style="color:#a8c8e8">\u2022 '+esc(matLine(m))+'</span>';}).join('<br>'):'';
     return '<div class="kv"><span style="flex:1 1 auto;min-width:0"><b>'+esc(dl)+' \u00b7 '+esc(tl)+'</b><br><span class="mut">'
-      +esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+(e.notes?' \u00b7 '+esc(e.notes):'')+'</span></span>'
+      +esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+(e.notes?' \u00b7 '+esc(e.notes):'')+matHtml+'</span></span>'
       +'<button class="btn sec sml" style="align-self:center;flex:0 0 auto;margin-left:12px" onclick="copyEntry(\''+e.id+'\')">Copy</button></div>';
   }).join('');
   if(total>30)h+='<p class="mut">Showing the 30 most recent entries.</p>';
@@ -1097,6 +1113,8 @@ function copyEntry(eid){
   if(p.customer)L.push('Customer: '+p.customer+(p.site?'  |  Site: '+p.site:''));
   L.push(e.startISO.slice(0,10)+'  |  '+fmtH(entryMinutes(e)));
   L.push('  '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(e.notes?'  \u2014  '+e.notes:''));
+  var mats=matsForEntry(e);
+  if(mats.length){ L.push('  Materials:'); mats.forEach(function(m){ L.push('  '+matLine(m)); }); }
   copyText(L.join('\n'));
 }
 function connectwiseNotes(p){
@@ -1230,6 +1248,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.16',items:['Connectwise Notes: copying a single entry now includes the day\u2019s materials on the last \u201cOn site\u201d entry (also shown in the list)']},
  {v:'3.0.15',items:['Fixed: removing a shared project on your device now leaves it instead of deleting it for the owner; re-inviting a member works again']},
  {v:'3.0.14',items:['Fixed (iOS): header no longer slides under the notch / status bar (safe-area padding)']},
  {v:'3.0.13',items:['Fixed: missing gap between the Active / Done tabs and the first project card']},
