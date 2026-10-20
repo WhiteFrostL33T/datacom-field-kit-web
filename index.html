@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.12';
+var APP_VERSION='3.0.13';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -427,7 +427,7 @@ function renderProjects(){
       return '<button onclick="setProjTab(\''+t+'\')" style="flex:1;padding:11px;border-radius:10px;cursor:pointer;font-weight:600;'
         +'border:1px solid '+(on?fill:'var(--line)')+';background:'+(on?fill:'var(--chip)')+';color:'+(on?'#e8f0f8':txt)+'">'
         +label+' ('+n+')</button>';};
-    h+='<div style="display:flex;gap:6px;margin-top:12px">'
+    h+='<div style="display:flex;gap:6px;margin:12px 0">'
       +tabBtn('active','Active',nA,'#1a5c3c','#56d69e')
       +tabBtn('done','Done',nD,'#7a2828','#f87171')
       +'</div>';
@@ -1226,6 +1226,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.13',items:['Fixed: missing gap between the Active / Done tabs and the first project card']},
  {v:'3.0.12',items:['Materials: \u201cYour picks\u201d is now a single swipeable row of pills (name and remove in one pill)']},
  {v:'3.0.11',items:['Projects view: Active / Done tabs with counts; status is now a colored pill on each card (green active, red done)']},
  {v:'3.0.10',items:['Time entries now snap start and end to the nearest 15 minutes (timer and manual entries); 15-minute minimum']},
