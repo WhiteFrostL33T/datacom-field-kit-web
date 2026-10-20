@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.11';
+var APP_VERSION='3.0.12';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1141,13 +1141,16 @@ function connectwiseNotes(p){
   return L.join('\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
 }
 function matPick(name,unit){$('mt_name').value=name;$('mt_unit').value=unit;$('mt_qty').focus();}
+function matPickIdx(i){var pk=(data.matPicks||[])[i];if(pk)matPick(pk.name,pk.unit);}
 function matPicksHTML(){
   var personal=data.matPicks||[];
   if(!personal.length)return '';
-  var h='<div class="mut" style="margin:0 0 4px">Your picks</div><div class="seg">'
+  var h='<div class="mut" style="margin:0 0 4px">Your picks</div>'
+    +'<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch">'
     +personal.map(function(pk,i){
-      return '<button type="button" class="preset" onclick="matPick(\''+esc(pk.name)+'\',\''+esc(pk.unit)+'\')">'+esc(pk.name)+'</button>'
-      +'<button type="button" class="preset" style="padding:6px 8px" onclick="delMatPick('+i+')" title="Remove pick">×</button>';}).join('')+'</div>';
+      return '<span style="display:inline-flex;align-items:center;flex:0 0 auto;background:var(--chip);border:1px solid var(--line);border-radius:999px">'
+      +'<button type="button" style="background:none;border:none;color:var(--text);font:inherit;padding:8px 2px 8px 12px;cursor:pointer;white-space:nowrap" onclick="matPickIdx('+i+')">'+esc(pk.name)+'</button>'
+      +'<button type="button" style="background:none;border:none;color:var(--mut);font:inherit;padding:8px 11px 8px 5px;cursor:pointer" onclick="delMatPick('+i+')" title="Remove pick">\u00d7</button></span>';}).join('')+'</div>';
   return h;}
 function delMatPick(i){if(!confirm('Remove this quick pick?'))return;
   (data.matPicks||[]).splice(i,1);save();render();}
@@ -1223,6 +1226,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.12',items:['Materials: \u201cYour picks\u201d is now a single swipeable row of pills (name and remove in one pill)']},
  {v:'3.0.11',items:['Projects view: Active / Done tabs with counts; status is now a colored pill on each card (green active, red done)']},
  {v:'3.0.10',items:['Time entries now snap start and end to the nearest 15 minutes (timer and manual entries); 15-minute minimum']},
  {v:'3.0.9',items:['Fixed: Copy buttons in \u201cCopy a single entry\u201d squeezed the entry text \u2014 buttons now use the compact inline style']},
