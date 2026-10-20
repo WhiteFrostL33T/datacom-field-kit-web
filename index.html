@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.8';
+var APP_VERSION='3.0.9';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1052,9 +1052,9 @@ function entryCopyListHTML(p){
     var dl=d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
     var tl=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+' \u2013 '
       +new Date(e.endISO).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
-    return '<div class="kv"><span><b>'+esc(dl)+' \u00b7 '+esc(tl)+'</b><br><span class="mut">'
+    return '<div class="kv"><span style="flex:1 1 auto;min-width:0"><b>'+esc(dl)+' \u00b7 '+esc(tl)+'</b><br><span class="mut">'
       +esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+(e.notes?' \u00b7 '+esc(e.notes):'')+'</span></span>'
-      +'<button class="btn sec" style="padding:6px 12px;align-self:center;flex:0 0 auto" onclick="copyEntry(\''+e.id+'\')">Copy</button></div>';
+      +'<button class="btn sec sml" style="align-self:center;flex:0 0 auto;margin-left:12px" onclick="copyEntry(\''+e.id+'\')">Copy</button></div>';
   }).join('');
   if(total>30)h+='<p class="mut">Showing the 30 most recent entries.</p>';
   return h;
@@ -1198,6 +1198,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.9',items:['Fixed: Copy buttons in \u201cCopy a single entry\u201d squeezed the entry text \u2014 buttons now use the compact inline style']},
  {v:'3.0.8',items:['Fixed: Share picker checkboxes rendered full-width above each email \u2014 now inline beside it']},
  {v:'3.0.7',items:['Fixed: Copy buttons in \u201cCopy a single entry\u201d stretched to full row height \u2014 now compact']},
  {v:'3.0.6',items:['Share project: pick people from a list with checkboxes instead of typing emails','Ticket shows as CW # next to the project name everywhere (cards, timer, dashboard, export)','Connectwise Notes: copy a single time entry (project header + that entry) for split days']},
