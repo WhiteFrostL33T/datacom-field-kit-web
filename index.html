@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.17';
+var APP_VERSION='3.0.18';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -520,9 +520,13 @@ function importProjectFile(){
       if(!pack||pack.kind!=='project-export'||!pack.project||!pack.project.id)
         throw new Error('Not a Field Kit project export');
       var p=JSON.parse(JSON.stringify(pack.project));
-      var copy=!!projById(p.id);
-      var newPid=copy?uid():p.id;
-      p.id=newPid;if(p.createdAt===undefined)p.createdAt=Date.now();
+      // Imports are ALWAYS fresh copies with new ids: keeping the source
+      // ids collides with the original's server rows (or its tombstone)
+      // and wedges sync for anyone who is not a member of the original.
+      var copy=true;
+      var newPid=uid();
+      p.id=newPid; delete p.owner_id;
+      if(p.createdAt===undefined)p.createdAt=Date.now();
       data.projects.push(p);
       var swMap={};
       function pushUnique(arr,x){
@@ -1248,6 +1252,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.18',items:['Importing a project now always makes a fresh copy with new IDs (fixes sync conflicts with the original project)']},
  {v:'3.0.17',items:['Fixed sync: projects stuck only on a device (never uploaded) now heal themselves and upload instead of failing every sync']},
  {v:'3.0.16',items:['Connectwise Notes: copying a single entry now includes the day\u2019s materials on the last \u201cOn site\u201d entry (also shown in the list)']},
  {v:'3.0.15',items:['Fixed: removing a shared project on your device now leaves it instead of deleting it for the owner; re-inviting a member works again']},
