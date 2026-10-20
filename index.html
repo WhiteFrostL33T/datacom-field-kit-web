@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.14';
+var APP_VERSION='3.0.15';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -473,7 +473,11 @@ function createProject(){
     enabledModules:DEFAULT_MODULES.slice()});
   save();render();toast('Project created');}
 function delProject(id){
-  if(!confirm('Delete this project and ALL its data (time, pulls, materials, etc.)?'))return;
+  var _p=projById(id);
+  var _mine=!_p||!_p.owner_id||!sbUser||_p.owner_id===sbUser.id;
+  if(!confirm(_mine
+    ?'Delete this project and ALL its data (time, pulls, materials, etc.)?'
+    :'Leave this project? It is removed from your device only \u2014 the project and its data stay with the owner.'))return;
   data.projects=data.projects.filter(function(p){return p.id!==id;});
   data.timeEntries=data.timeEntries.filter(function(e){return e.projectId!==id;});
   data.pulls=data.pulls.filter(function(x){return x.projectId!==id;});
@@ -487,7 +491,7 @@ function delProject(id){
   data.portSwitches=data.portSwitches.filter(function(s){return s.projectId!==id;});
   delete data.storageCalcs[id];delete data.ipSubnets[id];
   if(data.timer&&data.timer.projectId===id)data.timer=null;
-  save();goProjects();toast('Project deleted');}
+  save();goProjects();toast(_mine?'Project deleted':'Left project');}
 function exportProject(id){
   var p=projById(id);if(!p)return;
   var swIds=data.poeSwitches.filter(function(s){return s.projectId===id;}).map(function(s){return s.id;});
@@ -1226,6 +1230,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.15',items:['Fixed: removing a shared project on your device now leaves it instead of deleting it for the owner; re-inviting a member works again']},
  {v:'3.0.14',items:['Fixed (iOS): header no longer slides under the notch / status bar (safe-area padding)']},
  {v:'3.0.13',items:['Fixed: missing gap between the Active / Done tabs and the first project card']},
  {v:'3.0.12',items:['Materials: \u201cYour picks\u201d is now a single swipeable row of pills (name and remove in one pill)']},
@@ -1554,9 +1559,25 @@ function fromDB(table,r){
   return o;
 }
 
+function leftProjectIds(snap){
+  // Projects that vanished locally but belong to someone else: the user is
+  // LEAVING them, not deleting them. Their records must never be tombstoned.
+  var left={};
+  if(!sbUser) return left;
+  (snap.projects||[]).forEach(function(r){
+    if(r&&r.owner_id&&r.owner_id!==sbUser.id
+       &&!(data.projects||[]).some(function(p){return p.id===r.id;})) left[r.id]=1;
+  });
+  return left;
+}
 function pushChanges(){
   if(!sb||!sbUser) return Promise.resolve();
   var snap=lastSynced||emptySnapshot();
+  var leftIds=leftProjectIds(snap);
+  var leftSwitches={};
+  (snap.poeSwitches||[]).concat(snap.portSwitches||[]).forEach(function(s){
+    if(s&&leftIds[s.projectId]) leftSwitches[s.id]=1;
+  });
   function upsert(table,row){
     return sb.from(table).upsert(row,{onConflict:'id'}).then(function(r){ if(r.error) throw r.error; });
   }
@@ -1600,7 +1621,23 @@ function pushChanges(){
       delete row.owner_id;
       jobs.push(updateRow(cfg.table,r.id,row));
     });
-    d.removed.forEach(function(r){ jobs.push(softDel(cfg.table,r.id)); });
+    d.removed.forEach(function(r){
+      if(cfg.table==='projects'){
+        if(leftIds[r.id]){
+          // Leaving a shared project: drop our own membership row instead
+          // of tombstoning the owner's project. Best effort — needs the
+          // "members leave project" policy; without it the delete matches
+          // no rows and the project simply reappears on the next pull.
+          jobs.push(sb.from('project_members').delete().eq('project_id',r.id).eq('user_id',sbUser.id)
+            .then(function(){},function(){}));
+          return;
+        }
+        jobs.push(softDel(cfg.table,r.id)); return;
+      }
+      if(r.projectId&&leftIds[r.projectId]) return;
+      if(r.switchId&&leftSwitches[r.switchId]) return;
+      jobs.push(softDel(cfg.table,r.id));
+    });
     return Promise.all(jobs);
   }
   // Phase 1: projects first — RLS on child tables requires the parent row to exist
@@ -1642,12 +1679,14 @@ function pushTechnicians(snap){
   });
 }
 function pushSettings(snap){
+  var leftIds=leftProjectIds(snap);
   var pids={};
   Object.keys(data.storageCalcs||{}).forEach(function(k){pids[k]=1;});
   Object.keys(data.ipSubnets||{}).forEach(function(k){pids[k]=1;});
   Object.keys((snap&&snap.settings)||{}).forEach(function(k){pids[k]=1;});
   var jobs=[];
   Object.keys(pids).forEach(function(pid){
+    if(leftIds[pid]) return;
     var cur={storage:(data.storageCalcs||{})[pid],subnets:(data.ipSubnets||{})[pid]};
     var old=(snap.settings||{})[pid];
     if(JSON.stringify(canon(cur))!==JSON.stringify(canon(old||{}))){
