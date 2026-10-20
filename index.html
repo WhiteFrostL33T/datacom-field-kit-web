@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.5';
+var APP_VERSION='3.0.6';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -343,7 +343,7 @@ function renderTimerBar(){
     var h=Math.floor(el/3600),m=Math.floor(el%3600/60),s=el%3600%60;
     var pad=function(n){return String(n).padStart(2,'0');};
     bar.innerHTML='<span>Timer running — <b>'+esc(data.timer.kind)+'</b> · '+
-      esc(p?p.name:'(project deleted)')+'</span><span class="el">'+pad(h)+':'+pad(m)+':'+pad(s)+'</span>'+
+      esc(p?p.name:'(project deleted)')+cwSuffix(p)+'</span><span class="el">'+pad(h)+':'+pad(m)+':'+pad(s)+'</span>'+
       '<button class="hbtn" style="margin-left:auto" onclick="stopTimer()">Stop</button>';
     var te=$('tabTimerElapsed');if(te)te.textContent=pad(h)+':'+pad(m)+':'+pad(s);
   }
@@ -360,7 +360,7 @@ function renderTimer(){
   if(data.timer){
     var p=projById(data.timer.projectId);
     var st=new Date(data.timer.startISO);
-    h+='<div class="card"><div class="toprow"><div class="grow"><h3>'+esc(p?p.name:'(project deleted)')+'</h3>'
+    h+='<div class="card"><div class="toprow"><div class="grow"><h3>'+(p?esc(p.name)+cwTag(p):'(project deleted)')+'</h3>'
       +'<div class="mut">'+esc(data.timer.kind)+' \u00b7 started '+esc(st.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))+'</div></div></div>'
       +'<div class="bigtime" id="tabTimerElapsed">--:--:--</div>'
       +'<button class="btn red" onclick="stopTimer()">Stop</button></div>';
@@ -368,7 +368,7 @@ function renderTimer(){
   var projs=data.projects.filter(function(x){return x.status!=='done';});
   h+='<div class="card"><h3>Quick start</h3>'
     +'<label>Project</label><select id="qs_proj">'
-    +projs.map(function(x){return '<option value="'+x.id+'">'+esc(x.name)+'</option>';}).join('')+'</select>'
+    +projs.map(function(x){return '<option value="'+x.id+'">'+esc(x.name)+(x.ticket?' \u00b7 CW #'+esc(x.ticket):'')+'</option>';}).join('')+'</select>'
     +'<label>Kind</label><div class="seg">'
     +KINDS.map(function(k){return '<button type="button" class="'+(k===qsKind?'act':'')+'" onclick="setQsKind(\''+k+'\',this)">'+k+'</button>';}).join('')
     +'</div><button class="btn grn" onclick="quickStartTimer()">Start timer</button></div>';
@@ -411,9 +411,9 @@ function renderProjects(){
   data.projects.slice().sort(function(a,b){return ((a.status==='done')-(b.status==='done'))||((b.createdAt||0)-(a.createdAt||0));})
   .forEach(function(p){
     var mods=enabledMods(p);
-    h+='<div class="card projcard" onclick="openProject(\''+p.id+'\')"><div class="proj-head"><div class="grow"><h3>'+esc(p.name)+'</h3>'
+    h+='<div class="card projcard" onclick="openProject(\''+p.id+'\')"><div class="proj-head"><div class="grow"><h3>'+esc(p.name)+cwTag(p)+'</h3>'
       +'<div class="mut">'+esc(p.customer||'')+(p.customer&&p.site?' · ':'')+esc(p.site||'')
-      +(p.ticket?'<br>ConnectWise #'+esc(p.ticket):'')+'<br>Status: '+esc(p.status||'active')+'</div></div>'
+      +'<br>Status: '+esc(p.status||'active')+'</div></div>'
       +'<div class="cardmenu"><button class="iconbtn" aria-label="Project actions" onclick="event.stopPropagation();toggleCardMenu(\''+p.id+'\')">&#8942;</button>'
       +'<div class="cmenu" id="cmenu-'+p.id+'" style="display:none"><button onclick="event.stopPropagation();exportProject(\''+p.id+'\')">Export</button><button class="danger" onclick="event.stopPropagation();delProject(\''+p.id+'\')">Delete</button></div></div></div>'
       +'<div style="margin:8px 0">'+mods.map(function(m){
@@ -587,6 +587,8 @@ var memberCache={};
 function tbadge(label,color){
   return '<span class="tbadge" style="background:'+color+'">'+label+'</span>';
 }
+function cwTag(p){ return p&&p.ticket?' <span class="tbadge" style="background:#1d5c96">CW #'+esc(p.ticket)+'</span>':''; }
+function cwSuffix(p){ return p&&p.ticket?' \u00b7 CW #'+esc(p.ticket):''; }
 function loadMembers(pid,force){
   var p=projById(pid); if(!p||!sb||!sbUser) return;
   var c=memberCache[pid];
@@ -1033,13 +1035,45 @@ function finallogHTML(p){
     +'<p class="mut">Time and materials for this job, formatted for ConnectWise. This section is always on.</p>'
     +'<textarea id="cw_notes" readonly style="overflow:hidden">'+esc(connectwiseNotes(p))+'</textarea>'
     +'<div class="row"><button class="btn sec" onclick="copyText(val(\'cw_notes\'))">Copy notes</button>'
-    +'<button class="btn sec" onclick="saveFile(\'connectwise-notes.txt\',val(\'cw_notes\'))">Save .txt</button></div></div>';
+    +'<button class="btn sec" onclick="saveFile(\'connectwise-notes.txt\',val(\'cw_notes\'))">Save .txt</button></div></div>'
+    +'<div class="card"><h3>Copy a single entry</h3>'
+    +'<p class="mut">Copies the project header + just that entry — for days split across jobs.</p>'
+    +entryCopyListHTML(p)+'</div>';
   return h;
+}
+function entryCopyListHTML(p){
+  var entries=data.timeEntries.filter(function(e){return e.projectId===p.id;})
+    .sort(function(a,b){return a.startISO<b.startISO?1:-1;});
+  if(!entries.length)return '<p class="mut">No time entries yet.</p>';
+  var total=entries.length;
+  entries=entries.slice(0,30);
+  var h=entries.map(function(e){
+    var d=new Date(e.startISO);
+    var dl=d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+    var tl=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+' \u2013 '
+      +new Date(e.endISO).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    return '<div class="kv"><span><b>'+esc(dl)+' \u00b7 '+esc(tl)+'</b><br><span class="mut">'
+      +esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+(e.notes?' \u00b7 '+esc(e.notes):'')+'</span></span>'
+      +'<button class="btn sec" style="padding:6px 12px" onclick="copyEntry(\''+e.id+'\')">Copy</button></div>';
+  }).join('');
+  if(total>30)h+='<p class="mut">Showing the 30 most recent entries.</p>';
+  return h;
+}
+function copyEntry(eid){
+  var e=data.timeEntries.filter(function(x){return x.id===eid;})[0]; if(!e)return;
+  var p=projById(e.projectId); if(!p)return;
+  var L=[];
+  L.push('CONNECTWISE NOTES');
+  L.push(p.name+(p.ticket?'  |  CW #'+p.ticket:''));
+  if(p.customer)L.push('Customer: '+p.customer+(p.site?'  |  Site: '+p.site:''));
+  L.push(e.startISO.slice(0,10)+'  |  '+fmtH(entryMinutes(e)));
+  L.push('  '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(e.notes?'  \u2014  '+e.notes:''));
+  copyText(L.join('\n'));
 }
 function connectwiseNotes(p){
   var L=[];
   L.push('CONNECTWISE NOTES');
-  L.push(p.name+(p.ticket?'  |  ConnectWise #'+p.ticket:''));
+  L.push(p.name+(p.ticket?'  |  CW #'+p.ticket:''));
   if(p.customer)L.push('Customer: '+p.customer+(p.site?'  |  Site: '+p.site:''));
   L.push('Prepared: '+todayStr());
   L.push('');
@@ -1121,7 +1155,7 @@ function feedItem(it){
     time:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
     pull:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 17c4-6 12-6 16 0M4 7c4 6 12 6 16 0"/></svg>',
     mat:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8"/></svg>'};
-  var p=projById(it.e.projectId);var pn=p?p.name:'(deleted project)';
+  var p=projById(it.e.projectId);var pn=p?p.name+(p.ticket?' \u00b7 CW #'+p.ticket:''):'(deleted project)';
   var title='',sub=pn,when='';
   if(it.type==='time'){
     title=it.e.kind+' \u00b7 '+fmtHM(entryMinutes(it.e));
@@ -1164,6 +1198,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.6',items:['Share project: pick people from a list with checkboxes instead of typing emails','Ticket shows as CW # next to the project name everywhere (cards, timer, dashboard, export)','Connectwise Notes: copy a single time entry (project header + that entry) for split days']},
  {v:'3.0.5',items:['Technicians card now reflects project membership: owner + invited members (badged), hand-typed names kept as read-only legacy rows; manual add/remove removed \u2014 members are managed via \u22ee \u2192 Share project']},
  {v:'3.0.4',items:['Fixed projects sync: replaced upsert with explicit INSERT (falls back to UPDATE on conflict) \u2014 Postgres enforces both INSERT and UPDATE RLS policies on upsert, and the update check fails for rows that do not exist yet']},
  {v:'3.0.3',items:['New \u22ee menu item: Sync diagnostics (shows sign-in, token match, project ownership)','Fixed: a background pull could mark failed uploads as synced']},
@@ -1791,12 +1826,13 @@ function openShareDialog(){
   closeShareDialog();
   var ov=document.createElement('div');
   ov.className='dlg-ov'; ov.id='shareDlg';
+  shareSel={};
   ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Share project</h3></div>'
     +'<p class="mut" style="margin-top:0">Invite people to collaborate on &ldquo;'+esc(p.name)+'&rdquo;.</p>'
-    +'<div id="share_list"><p class="mut">Loading…</p></div>'
-    +'<div class="row" style="margin-top:10px"><input id="inv_email" type="email" placeholder="teammate@example.com" style="flex:1">'
-    +'<button class="btn pri" onclick="inviteMember()">Invite</button></div>'
-    +'<button class="btn sec" style="width:100%;margin-top:12px" onclick="closeShareDialog()">Done</button></div>';
+    +'<div class="seclbl">Members</div><div id="share_list"><p class="mut">Loading…</p></div>'
+    +'<div class="seclbl" style="margin-top:12px">Invite — tap to select</div><div id="share_invite"><p class="mut">Loading…</p></div>'
+    +'<button class="btn pri" id="share_inv_btn" style="width:100%;margin-top:12px" disabled onclick="inviteSelected()">Select people to invite</button>'
+    +'<button class="btn sec" style="width:100%;margin-top:8px" onclick="closeShareDialog()">Done</button></div>';
   ov.addEventListener('click',function(e){ if(e.target===ov) closeShareDialog(); });
   document.body.appendChild(ov);
   loadShareList();
@@ -1819,23 +1855,39 @@ function loadShareList(){
           +'<button class="iconbtn" aria-label="Remove member" onclick="removeMember(\''+m.user_id+'\')">'+TRASH_SVG+'</button></div>';
       });
       box.innerHTML=h;
+      loadInviteList(ids,ownerId);
     });
   });
 }
-function inviteMember(){
-  var em=val('inv_email').toLowerCase();
-  if(!em){ toast('Enter an email'); return; }
-  sb.from('profiles').select('id').eq('email',em).then(function(r){
-    if(r.error||!r.data||!r.data.length){ toast('No Field Kit account for '+em); return; }
-    var uid2=r.data[0].id;
-    if(uid2===sbUser.id){ toast('That is you'); return; }
-    sb.from('project_members').upsert({project_id:view.id,user_id:uid2,role:'member'},{onConflict:'project_id,user_id'})
-      .then(function(r2){
-        if(r2.error){ toast('Invite failed'); return; }
-        toast('Invited '+em);
-        var ie=document.getElementById('inv_email'); if(ie) ie.value='';
-        loadShareList(); loadMembers(view.id,true);
-      });
+var shareSel={};
+function loadInviteList(memberIds,ownerId){
+  var box=document.getElementById('share_invite'); if(!box||!sb) return;
+  sb.from('profiles').select('id,email').order('email').then(function(r){
+    if(r.error){ box.innerHTML='<div class="err">Could not load users.</div>'; return; }
+    var users=(r.data||[]).filter(function(u){
+      return u.id!==sbUser.id&&u.id!==ownerId&&memberIds.indexOf(u.id)<0;});
+    if(!users.length){ box.innerHTML='<p class="mut">Everyone already has access.</p>'; updateInviteBtn(); return; }
+    box.innerHTML=users.map(function(u){
+      return '<label class="kv" style="cursor:pointer"><span><input type="checkbox"'+(shareSel[u.id]?' checked':'')+' onchange="toggleShareSel(\''+u.id+'\',this.checked)" style="margin-right:10px;transform:scale(1.25)">'+esc(u.email||'')+'</span></label>';
+    }).join('');
+    updateInviteBtn();
+  });
+}
+function toggleShareSel(uid2,on){ if(on)shareSel[uid2]=1; else delete shareSel[uid2]; updateInviteBtn(); }
+function updateInviteBtn(){
+  var b=document.getElementById('share_inv_btn'); if(!b) return;
+  var n=Object.keys(shareSel).length;
+  b.disabled=!n;
+  b.textContent=n?('Invite '+n+(n===1?' person':' people')):'Select people to invite';
+}
+function inviteSelected(){
+  var ids=Object.keys(shareSel); if(!ids.length) return;
+  var rows=ids.map(function(u){ return {project_id:view.id,user_id:u,role:'member'}; });
+  sb.from('project_members').upsert(rows,{onConflict:'project_id,user_id'}).then(function(r){
+    if(r.error){ toast('Invite failed'); return; }
+    toast('Invited '+ids.length+(ids.length===1?' person':' people'));
+    shareSel={};
+    loadShareList(); loadMembers(view.id,true);
   });
 }
 function removeMember(uid2){
