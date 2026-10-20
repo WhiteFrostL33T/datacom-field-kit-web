@@ -205,7 +205,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.6';
+var APP_VERSION='3.0.7';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1054,7 +1054,7 @@ function entryCopyListHTML(p){
       +new Date(e.endISO).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
     return '<div class="kv"><span><b>'+esc(dl)+' \u00b7 '+esc(tl)+'</b><br><span class="mut">'
       +esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+(e.notes?' \u00b7 '+esc(e.notes):'')+'</span></span>'
-      +'<button class="btn sec" style="padding:6px 12px" onclick="copyEntry(\''+e.id+'\')">Copy</button></div>';
+      +'<button class="btn sec" style="padding:6px 12px;align-self:center;flex:0 0 auto" onclick="copyEntry(\''+e.id+'\')">Copy</button></div>';
   }).join('');
   if(total>30)h+='<p class="mut">Showing the 30 most recent entries.</p>';
   return h;
@@ -1198,6 +1198,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.7',items:['Fixed: Copy buttons in \u201cCopy a single entry\u201d stretched to full row height \u2014 now compact']},
  {v:'3.0.6',items:['Share project: pick people from a list with checkboxes instead of typing emails','Ticket shows as CW # next to the project name everywhere (cards, timer, dashboard, export)','Connectwise Notes: copy a single time entry (project header + that entry) for split days']},
  {v:'3.0.5',items:['Technicians card now reflects project membership: owner + invited members (badged), hand-typed names kept as read-only legacy rows; manual add/remove removed \u2014 members are managed via \u22ee \u2192 Share project']},
  {v:'3.0.4',items:['Fixed projects sync: replaced upsert with explicit INSERT (falls back to UPDATE on conflict) \u2014 Postgres enforces both INSERT and UPDATE RLS policies on upsert, and the update check fails for rows that do not exist yet']},
