@@ -104,6 +104,11 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
 .bigtime{font-size:2.4rem;font-weight:800;text-align:center;letter-spacing:2px;margin:8px 0 12px;font-variant-numeric:tabular-nums;}
 .ver{display:inline-block;background:var(--chip);border:1px solid var(--line);color:#aeb8ff;
   border-radius:999px;padding:4px 14px;font-size:.85rem;margin:6px 0;}
+.modtile{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:14px;cursor:pointer;color:var(--text);width:100%;}
+.mod-ic{display:inline-flex;width:38px;height:38px;border-radius:11px;background:var(--chip);
+  align-items:center;justify-content:center;color:var(--accent);}
+.mod-ic svg{width:20px;height:20px;}
 .feeditem{display:flex;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line);align-items:flex-start;}
 .feeditem:last-child{border-bottom:none;}
 .fic{width:40px;height:40px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--chip);}
@@ -206,7 +211,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.21';
+var APP_VERSION='3.0.22';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -603,10 +608,14 @@ function renderProject(){
   loadMembers(p.id);
   var mods=enabledMods(p);
   if(curTab!=='overview'&&mods.indexOf(curTab)<0)curTab='overview';
+  var pc=projColor(p);
+  var doneP=(p.status||'active')==='done';
   var h='<button class="btn sec sml" onclick="goProjects()">&#8592; All projects</button>'
-    +'<h2 style="margin:12px 0 2px">'+esc(p.name)+'</h2>'
-    +'<div class="mut">'+esc(p.customer||'')+(p.site?' · '+esc(p.site):'')
+    +'<div style="background:'+pc+';border-radius:18px;padding:16px 14px;margin-top:12px;color:#0d1020">'
+    +'<div style="font-size:1.4rem;font-weight:800">'+esc(p.name)+'</div>'
+    +'<div style="opacity:.78;font-size:.92rem">'+esc(p.customer||'')+(p.site?' · '+esc(p.site):'')
     +(p.ticket?' · CW #'+esc(p.ticket):'')+'</div>'
+    +'<div style="margin-top:10px"><span class="tbadge" style="background:rgba(0,0,0,.28);color:#fff">'+(doneP?'Done':'Active')+'</span></div></div>'
     +'<div id="tabBody" style="margin-top:12px"></div>';
   $('app').innerHTML=h;
   var body=$('tabBody');
@@ -624,9 +633,46 @@ function renderProject(){
     var st=$('te_start'),en=$('te_end');
     if(st&&!st.value)st.value='08:00';if(en&&!en.value)en.value='09:00';}
 }
+function modMetric(p,id){
+  if(id==='time')return data.timeEntries.filter(function(e){return e.projectId===p.id;}).length+' entries';
+  if(id==='cable')return projectCableFt(p.id)+' ft pulled';
+  if(id==='materials')return data.materials.filter(function(m){return m.projectId===p.id;}).length+' lines';
+  if(id==='poe')return data.poeSwitches.filter(function(s){return s.projectId===p.id;}).length+' switches';
+  if(id==='subnet')return data.ipAssignments.filter(function(a){return a.projectId===p.id;}).length+' IPs assigned';
+  if(id==='ports')return data.portEntries.filter(function(e){return e.projectId===p.id;}).length+' entries';
+  return '';
+}
 function overviewHTML(p){
   var mods=enabledMods(p);
-  var h='<div class="card"><div class="cardhd"><h3>Details</h3><button class="gearbtn" aria-label="Module settings" onclick="openModuleDialog()">'+GEAR_SVG+'</button></div>'
+  var pc=projColor(p);
+  var stat=function(lbl,val){return '<div style="flex:1;background:var(--panel2);border-radius:12px;padding:9px 4px;text-align:center"><div class="mut" style="font-size:.7rem">'+lbl+'</div><b>'+val+'</b></div>';};
+  var h='<div class="card"><div style="color:'+pc+';font-weight:700;font-size:.78rem;letter-spacing:.6px">TOTAL TIME</div>'
+    +'<div style="font-size:2.1rem;font-weight:800;margin:4px 0">'+fmtHM(projectMinutes(p.id))+'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:10px">'
+    +stat('Cable',projectCableFt(p.id)+' ft')
+    +stat('Materials',data.materials.filter(function(m){return m.projectId===p.id;}).length)
+    +stat('Entries',data.timeEntries.filter(function(e){return e.projectId===p.id;}).length)
+    +'</div></div>';
+  var tileIds=mods.slice();
+  if(tileIds.indexOf('finallog')<0)tileIds.splice(Math.min(3,tileIds.length),0,'finallog');
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+    +tileIds.map(function(id){
+      var lbl=MODULES.filter(function(x){return x[0]===id;})[0];
+      var met=modMetric(p,id);
+      return '<button class="modtile" onclick="setTab(\''+id+'\')"><span class="mod-ic">'+(MODICONS[id]||'')+'</span>'
+        +'<div style="font-weight:700;margin-top:9px">'+esc(lbl?lbl[1]:id)+'</div>'
+        +(met?'<div class="mut" style="font-size:.8rem;margin-top:2px">'+esc(met)+'</div>':'')
+        +'</button>';}).join('')+'</div>';
+  var ev=[];
+  data.timeEntries.forEach(function(e){ if(e.projectId!==p.id)return; var t=new Date(e.startISO).getTime(); ev.push({t:isFinite(t)?t:0,type:'time',e:e}); });
+  data.pulls.forEach(function(x){ if(x.projectId!==p.id)return; var t=x.createdAt||(x.date?new Date(x.date+'T12:00:00').getTime():0); ev.push({t:isFinite(t)?t:0,type:'pull',e:x}); });
+  data.materials.forEach(function(m){ if(m.projectId!==p.id)return; ev.push({t:m.createdAt||0,type:'mat',e:m}); });
+  ev.sort(function(a,b){return b.t-a.t;}); ev=ev.slice(0,5);
+  h+='<div class="card"><div class="cardhd"><h3>Recent on this project</h3></div>';
+  if(!ev.length) h+='<p class="mut">Nothing logged yet on this project.</p>';
+  ev.forEach(function(it){ h+=feedItem(it); });
+  h+='</div>';
+  h+='<div class="card"><div class="cardhd"><h3>Details</h3><button class="gearbtn" aria-label="Module settings" onclick="openModuleDialog()">'+GEAR_SVG+'</button></div>'
     +'<div class="kv"><span class="mut">Customer</span><b>'+esc(p.customer||'—')+'</b></div>'
     +'<div class="kv"><span class="mut">Site</span><b>'+esc(p.site||'—')+'</b></div>'
     +'<div class="kv"><span class="mut">ConnectWise ticket</span><b>'+esc(p.ticket||'—')+'</b></div>'
@@ -636,11 +682,10 @@ function overviewHTML(p){
     +'<button class="btn sec" onclick="toggleProjStatus()">Mark '+(p.status==='done'?'active':'done')+'</button></div>'
     +'<div id="editProj"></div></div>';
   h+=techCardHTML(p);
-  h+='<div class="card"><h3>Totals</h3>'
-    +'<div class="kv"><span class="mut">Time tracked</span><b>'+fmtHM(projectMinutes(p.id))+'</b></div>'
-    +'<div class="kv"><span class="mut">Cable used</span><b>'+projectCableFt(p.id)+' ft</b></div>'
-    +'<div class="kv"><span class="mut">Materials lines</span><b>'
-    +data.materials.filter(function(m){return m.projectId===p.id;}).length+'</b></div></div>';
+  if(data.timer&&data.timer.projectId===p.id)
+    h+='<button class="btn" disabled style="background:var(--chip);color:var(--muted)">Timer running on this project</button>';
+  else
+    h+='<button class="btn grn" onclick="startTimer(\''+p.id+'\',\'On site\')">\u25b6 Start Timer \u00b7 On site</button>';
   return h;
 }
 function openModuleDialog(){
@@ -1302,6 +1347,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.22',items:['New look, step 4: inside a project \u2014 color header band, total-time hero, module tiles, recent activity and a Start Timer button']},
  {v:'3.0.21',items:['New look, step 3: project cards are now color-banded tiles with total hours in the project\u2019s color']},
  {v:'3.0.20',items:['New look, step 2: Projects screen opens with a home header \u2014 today\u2019s time, this week\u2019s hours chart and recent activity']},
  {v:'3.0.19',items:['New look, step 1 of the Visual Dashboard redesign: refreshed colors and pill tab bar']},
