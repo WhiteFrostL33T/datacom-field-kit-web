@@ -147,6 +147,20 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
   box-shadow:0 6px 18px rgba(0,0,0,.5);}
 .hdrmenu .cmenu button{display:block;width:100%;text-align:left;background:none;border:none;
   padding:13px 14px;font-size:.95rem;cursor:pointer;color:var(--text);}
+@media (min-width:1024px){
+  main{max-width:1180px;margin-left:246px;margin-right:auto;padding:22px 26px 60px;}
+  header{padding-left:262px;}
+  #tabbar{left:0;right:auto;top:0;width:230px;flex-direction:column;justify-content:flex-start;
+    padding:96px 14px 16px;border-top:none;border-right:1px solid var(--line);}
+  .btab{flex:0 0 auto;width:100%;flex-direction:row;justify-content:flex-start;gap:12px;
+    padding:12px 16px;font-size:.95rem;min-height:50px;margin:3px 0;}
+  .btab svg{width:23px;height:23px;}
+  .projgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .projgrid .card{margin:0;}
+  .modgrid{grid-template-columns:repeat(3,1fr) !important;}
+  .fab{right:34px;bottom:34px;}
+  #toast{bottom:40px;}
+}
 </style>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js");}</script>
 </head>
@@ -211,7 +225,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.22';
+var APP_VERSION='4.0';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -277,6 +291,7 @@ function goTimer(){view={name:'timer'};render();}
 function goDashboard(){view={name:'dashboard'};render();}
 function goBackup(){view={name:'backup'};render();}
 function goAbout(){view={name:'about'};render();}
+function goAdmin(){view={name:'admin'};render();}
 function openProject(id){view={name:'project',id:id};curTab='overview';render();}
 function setTab(t){curTab=t;render();}
 $('btnMore').addEventListener('click',function(e){e.stopPropagation();toggleHdrMenu();});
@@ -312,7 +327,7 @@ function renderTabBar(){
     }).join('');
     return;
   }
-  var active=(view.name==='backup'||view.name==='about')?null:view.name;
+  var active=(view.name==='backup'||view.name==='about'||view.name==='admin')?null:view.name;
   $('tabbar').innerHTML=TABDEF.map(function(t){
     return '<button class="btab'+(active===t.id?' act':'')+'" onclick="go'+t.label+'()">'+t.icon+'<span>'+t.label+'</span></button>';
   }).join('');
@@ -328,6 +343,7 @@ function render(skipTrack){
     view.name==='dashboard'?'Dashboard':
     view.name==='backup'?'Backup / Restore':
     view.name==='about'?'About':
+    view.name==='admin'?'Admin':
     (projById(view.id)?projById(view.id).name:'Project');
   renderTimerBar();
   if(view.name==='projects')renderProjects();
@@ -335,6 +351,7 @@ function render(skipTrack){
   else if(view.name==='dashboard')renderDashboard();
   else if(view.name==='backup')renderBackup();
   else if(view.name==='about')renderAbout();
+  else if(view.name==='admin')renderAdmin();
   else renderProject();
   renderTabBar();
   if(!skipTrack)trackNav(true);
@@ -364,24 +381,54 @@ function setQsKind(k,el){qsKind=k;var bs=el.parentNode.querySelectorAll('button'
 function quickStartTimer(){
   var pid=val('qs_proj');if(!pid){toast('Choose a project');return;}
   startTimer(pid,qsKind);}
+function switchTimerKind(k){
+  if(!data.timer)return;
+  data.timer.kind=k; save(); render();
+  toast('Timer kind: '+k);
+}
 function renderTimer(){
   var h='';
+  var now=new Date();
+  h+='<div style="margin:4px 2px 12px"><div class="mut" style="font-size:.95rem">'+esc(now.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}))+'</div>'
+    +'<div style="font-size:1.55rem;font-weight:800;margin-top:2px">Timer</div></div>';
   if(data.timer){
     var p=projById(data.timer.projectId);
     var st=new Date(data.timer.startISO);
-    h+='<div class="card"><div class="toprow"><div class="grow"><h3>'+(p?esc(p.name)+cwTag(p):'(project deleted)')+'</h3>'
-      +'<div class="mut">'+esc(data.timer.kind)+' \u00b7 started '+esc(st.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))+'</div></div></div>'
-      +'<div class="bigtime" id="tabTimerElapsed">--:--:--</div>'
-      +'<button class="btn red" onclick="stopTimer()">Stop</button></div>';
+    var pc=p?projColor(p):'#7c8cff';
+    var projEnd=snapRange(st,new Date())[1];
+    h+='<div class="card" style="padding-top:0;overflow:hidden">'
+      +'<div style="height:10px;background:'+pc+';margin:0 -14px 14px"></div>'
+      +'<div><span class="tbadge" style="background:#14302a;color:#7ce7b0">● RUNNING</span> '
+      +'<span class="tbadge" style="background:var(--chip);color:var(--text)">'+esc(data.timer.kind)+'</span></div>'
+      +'<h3 style="font-size:1.25rem;margin:12px 0 2px">'+(p?esc(p.name)+cwTag(p):'(project deleted)')+'</h3>'
+      +'<div class="mut">Started '+esc(st.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))+(p&&p.customer?' · '+esc(p.customer):'')+(p&&p.site?' '+esc(p.site):'')+'</div>'
+      +'<div class="bigtime" id="tabTimerElapsed" style="font-size:3.4rem;margin:14px 0 6px">--:--:--</div>'
+      +'<div class="mut" style="text-align:center">Will round to '+fmtClock(projEnd)+' on stop (nearest 15 min)</div>'
+      +'<div class="row" style="margin-top:14px"><button class="btn red" onclick="stopTimer()">■ Stop</button>'
+      +(p?'<button class="btn sec" onclick="openProject(\''+p.id+'\')">Open project</button>':'')+'</div>'
+      +'<div class="seclbl">Switch kind</div><div class="seg">'
+      +KINDS.map(function(k){return '<button type="button" class="'+(k===data.timer.kind?'act':'')+'" onclick="switchTimerKind(\''+k+'\')">'+k+'</button>';}).join('')
+      +'</div></div>';
   }
   var projs=data.projects.filter(function(x){return x.status!=='done';});
-  h+='<div class="card"><h3>Quick start</h3>'
-    +'<label>Project</label><select id="qs_proj">'
-    +projs.map(function(x){return '<option value="'+x.id+'">'+esc(x.name)+(x.ticket?' \u00b7 CW #'+esc(x.ticket):'')+'</option>';}).join('')+'</select>'
-    +'<label>Kind</label><div class="seg">'
-    +KINDS.map(function(k){return '<button type="button" class="'+(k===qsKind?'act':'')+'" onclick="setQsKind(\''+k+'\',this)">'+k+'</button>';}).join('')
-    +'</div><button class="btn grn" onclick="quickStartTimer()">Start timer</button></div>';
-  if(!projs.length)h='<div class="card"><p class="mut">No active projects. Create one on the Projects tab first.</p></div>';
+  if(projs.length){
+    h+='<div class="card"><h3>Quick start</h3>'
+      +'<label>Kind</label><div class="seg">'
+      +KINDS.map(function(k){return '<button type="button" class="'+(k===qsKind?'act':'')+'" onclick="setQsKind(\''+k+'\',this)">'+k+'</button>';}).join('')
+      +'</div>'
+      +projs.map(function(x){
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)">'
+          +'<span style="width:12px;height:12px;border-radius:50%;background:'+projColor(x)+';flex:0 0 auto"></span>'
+          +'<div style="flex:1;min-width:0"><b>'+esc(x.name)+esc(cwSuffix(x))+'</b><div class="mut">'+esc(x.customer||'')+(x.site?' · '+esc(x.site):'')+'</div></div>'
+          +'<button class="btn sec sml" style="flex:0 0 auto" onclick="startTimer(\''+x.id+'\',qsKind)">Start</button></div>';}).join('')
+      +'</div>';
+  } else if(!data.timer){
+    h+='<div class="card"><p class="mut">No active projects. Create one on the Projects tab first.</p></div>';
+  }
+  var todayKey=dayOfTs(Date.now()), tmins=0, pset={};
+  data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===todayKey){ tmins+=entryMinutes(e); pset[e.projectId]=1; } });
+  var nproj=Object.keys(pset).length;
+  h+='<div class="card"><div class="mut">Today so far</div><b style="font-size:1.15rem">'+fmtHM(tmins)+(nproj?' across '+nproj+' project'+(nproj>1?'s':''):'')+'</b></div>';
   $('app').innerHTML=h;
 }
 function startTimer(pid,kind){
@@ -488,6 +535,7 @@ function renderProjects(){
       h+='<div class="card" style="margin-top:12px"><p class="mut">'
         +(projTab==='done'?'No done projects yet.':'No active projects.')+'</p></div>';
   }
+  h+='<div class="projgrid">';
   shown.forEach(function(p){
     var done=(p.status||'active')==='done';
     var pc=projColor(p);
@@ -501,6 +549,7 @@ function renderProjects(){
       +tbadge(done?'done':'active',done?'#a33333':'#1e7a46')
       +'<b style="font-size:1.35rem;color:'+pc+'">'+fmtHM(projectMinutes(p.id))+'</b></div></div>';
   });
+  h+='</div>';
   h+='<button class="fab" aria-label="New project" onclick="fabNewProject()">+</button>';
   $('app').innerHTML=h;
 }
@@ -655,7 +704,7 @@ function overviewHTML(p){
     +'</div></div>';
   var tileIds=mods.slice();
   if(tileIds.indexOf('finallog')<0)tileIds.splice(Math.min(3,tileIds.length),0,'finallog');
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+  h+='<div class="modgrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
     +tileIds.map(function(id){
       var lbl=MODULES.filter(function(x){return x[0]===id;})[0];
       var met=modMetric(p,id);
@@ -776,9 +825,15 @@ function saveProjectEdit(){var p=projById(view.id);
   p.ticket=val('ep_ticket');p.notes=val('ep_notes');save();render();toast('Project updated');}
 /* ============ TIME TAB ============ */
 var teEditId=null;
+function modHero(p,label,metric){
+  return '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:2px 2px 12px">'
+    +'<div style="font-size:1.3rem;font-weight:800">'+esc(label)+'</div>'
+    +(metric?'<div style="color:'+projColor(p)+';font-weight:700;font-size:1.05rem;white-space:nowrap">'+esc(metric)+'</div>':'')
+    +'</div>';
+}
 function timeHTML(p){
   var running=data.timer&&data.timer.projectId===p.id;
-  var h='<div class="card"><h3>Timer</h3>';
+  var h=modHero(p,'Time',fmtHM(projectMinutes(p.id)))+'<div class="card"><h3>Timer</h3>';
   if(data.timer){
     h+='<p class="mut">A timer is running ('+esc(data.timer.kind)+' on '
       +esc((projById(data.timer.projectId)||{}).name||'another project')+'). Stop it from the bar at the top.</p>';
@@ -857,7 +912,7 @@ function cableHTML(p){
     if(!boxes[key])boxes[key]={size:Number(x.boxSize)||1000,used:0,rows:[]};
     boxes[key].used+=Number(x.used)||0;boxes[key].rows.push(x);});
   var boxNames=Object.keys(boxes);
-  var h='<div class="card"><h3>Add cable pull</h3>'
+  var h=modHero(p,'Cable',projectCableFt(p.id)+' ft')+'<div class="card"><h3>Add cable pull</h3>'
     +'<div class="row"><div><label>Cable type</label><input id="cp_run" placeholder="e.g. Cat6"></div>'
     +'<div><label>Box label</label><input id="cp_box" list="boxlist" value="Box 1">'
     +'<datalist id="boxlist">'+boxNames.map(function(b){return '<option value="'+esc(b)+'">';}).join('')+'</datalist></div></div>'
@@ -916,7 +971,7 @@ function delPull(id){if(!confirm('Delete this pull?'))return;
 var ST_PRESETS=[['1080p',4],['4MP',8],['5MP',10],['4K',16]];
 function storageHTML(p){
   var s=data.storageCalcs[p.id]||{cameras:16,bitrate:4,hours:24,days:30,availTB:''};
-  var h='<div class="card"><h3>Camera storage calculator</h3>'
+  var h=modHero(p,'Camera storage','')+'<div class="card"><h3>Camera storage calculator</h3>'
     +'<div class="row"><div><label>Cameras</label><input id="st_cams" type="number" inputmode="numeric" value="'+esc(s.cameras)+'" oninput="storageRecalc(curProj())"></div>'
     +'<div><label>Bitrate per camera (Mbps)</label><input id="st_bit" type="number" inputmode="decimal" value="'+esc(s.bitrate)+'" oninput="storageRecalc(curProj())"></div></div>'
     +'<div class="seg">'+ST_PRESETS.map(function(pr){
@@ -946,28 +1001,39 @@ function storageRecalc(p){
 var POE_PRESETS=[['Fixed camera',15],['PTZ',30],['Hi-PoE PTZ',60],['Wi-Fi AP',25],['Phone',7]];
 function poeHTML(p){
   var sws=data.poeSwitches.filter(function(s){return s.projectId===p.id;});
-  var h='<div class="card"><h3>Add switch</h3>'
-    +'<div class="row"><div><label>Switch name</label><input id="poe_swname" placeholder="e.g. MDF switch"></div>'
-    +'<div><label>PoE budget (W)</label><input id="poe_budget" type="number" inputmode="decimal" placeholder="720"></div></div>'
-    +'<div class="seg"><button type="button" onclick="$(\'poe_budget\').value=720;$(\'poe_swname\').value=$(\'poe_swname\').value||\'USW-Pro-Max-48-PoE\'">Preset: USW-Pro-Max-48-PoE · 720W</button></div>'
-    +'<button class="btn" onclick="addPoeSwitch()">Add switch</button></div>';
-  if(!sws.length)h+='<div class="card"><p class="mut">No switches yet.</p></div>';
-  sws.forEach(function(sw){
+  var DEV_COLORS=['#2dd4bf','#fb923c','#7c8cff','#f472b6'];
+  var totalAll=sws.reduce(function(s,sw){return s+data.poeDevices.filter(function(d){return d.switchId===sw.id;}).reduce(function(a,d){return a+(Number(d.watts)||0)*(Number(d.qty)||0);},0);},0);
+  var h=modHero(p,'PoE Budget',totalAll.toFixed(0)+' W total');
+  if(!sws.length)h+='<div class="card"><p class="mut">No switches yet. Add your first switch below.</p></div>';
+  sws.forEach(function(sw,swi){
     var devs=data.poeDevices.filter(function(d){return d.switchId===sw.id;});
     var total=devs.reduce(function(s,d){return s+(Number(d.watts)||0)*(Number(d.qty)||0);},0);
     var pct=sw.budget>0?Math.min(100,total/sw.budget*100):0;
-    var cls=total>sw.budget?'over':(sw.budget>0&&total/sw.budget>0.8?'warn':'');
-    h+='<div class="card"><div class="proj-head"><div class="grow"><h3>'+esc(sw.name)+'</h3>'
-      +'<div class="mut">Budget '+sw.budget+' W</div></div>'
+    var over=total>sw.budget;
+    var warn=!over&&sw.budget>0&&total/sw.budget>0.8;
+    var maxDev=devs.reduce(function(m,d){return Math.max(m,(Number(d.watts)||0)*(Number(d.qty)||0));},0);
+    h+='<div class="card" style="padding-top:0;overflow:hidden">'
+      +'<div style="height:10px;background:var(--pnk);margin:0 -14px 14px"></div>'
+      +'<div class="proj-head"><div class="grow"><h3 style="font-size:1.2rem">'+esc(sw.name)+'</h3>'
+      +'<div class="mut">PoE budget '+sw.budget+' W</div></div>'
       +'<button class="del" onclick="delPoeSwitch(\''+sw.id+'\')">Delete</button></div>'
-      +'<div class="big">'+total.toFixed(1)+' W <span class="mut" style="font-size:.9rem">of '+sw.budget+' W ('+(sw.budget>0?(total/sw.budget*100).toFixed(0):'—')+'%)</span></div>'
-      +'<div class="bar"><i class="'+cls+'" style="width:'+pct+'%"></i></div>'
-      +(total>sw.budget?'<div class="err">Over budget by '+(total-sw.budget).toFixed(1)+' W.</div>'
-        :(cls==='warn'?'<div class="err" style="background:#3a2f07;border-color:var(--amber);color:#ffe1a8">Over 80% of budget — check headroom.</div>':''))
-      +'<table><tr><th>Device</th><th>W ea</th><th>Qty</th><th>Total</th><th></th></tr>'
-      +devs.map(function(d){return '<tr><td>'+esc(d.name)+'</td><td>'+d.watts+'</td><td>'+d.qty+'</td><td><b>'
-        +((Number(d.watts)||0)*(Number(d.qty)||0)).toFixed(1)+'</b></td>'
-        +'<td><button class="del" onclick="delPoeDevice(\''+d.id+'\')">Del</button></td></tr>';}).join('')+'</table>'
+      +'<div style="margin:10px 0 2px"><span style="font-size:2.1rem;font-weight:800">'+total.toFixed(0)+' W</span>'
+      +' <span class="mut">of '+sw.budget+' W budget</span></div>'
+      +'<div class="bar" style="height:16px;border-radius:8px"><i style="width:'+pct+'%;background:'+(over?'var(--red)':warn?'var(--amber)':'var(--pnk)')+'"></i></div>'
+      +'<div class="mut" style="margin-top:7px">'+(sw.budget>0?(total/sw.budget*100).toFixed(0):'—')+'% used · '+(over?'<span style="color:var(--red)">over by '+(total-sw.budget).toFixed(0)+' W</span>':(sw.budget-total).toFixed(0)+' W headroom')+'</div>'
+      +(over?'<div class="err">Over budget by '+(total-sw.budget).toFixed(1)+' W.</div>'
+        :(warn?'<div class="err" style="background:#3a2f07;border-color:var(--amber);color:#ffe1a8">Over 80% of budget — check headroom.</div>'
+        :'<div style="margin-top:8px"><span class="tbadge" style="background:#14302a;color:#7ce7b0">✓ Within budget</span></div>'))
+      +(devs.length?'<div class="seclbl">Devices on this switch</div>':'')
+      +devs.map(function(d,di){
+        var dt=(Number(d.watts)||0)*(Number(d.qty)||0);
+        var dc=DEV_COLORS[di%DEV_COLORS.length];
+        return '<div style="padding:9px 0;border-bottom:1px solid var(--line)">'
+          +'<div style="display:flex;align-items:center;gap:10px"><span style="width:11px;height:11px;border-radius:50%;background:'+dc+';flex:0 0 auto"></span>'
+          +'<div style="flex:1;min-width:0"><b>'+esc(d.name)+'</b><div class="mut">'+d.watts+' W × '+d.qty+'</div></div>'
+          +'<b style="font-size:1.05rem">'+dt.toFixed(0)+' W</b>'
+          +'<button class="del" style="padding:4px 6px;min-height:32px" onclick="delPoeDevice(\''+d.id+'\')">✕</button></div>'
+          +'<div class="bar" style="height:7px;margin:7px 0 0 21px"><i style="width:'+(maxDev?Math.round(dt/maxDev*100):0)+'%;background:'+dc+'"></i></div></div>';}).join('')
       +'<h4>Add device</h4><div class="seg">'
       +POE_PRESETS.map(function(pr){return '<button type="button" class="preset" onclick="poeFill(\''+sw.id+'\',\''+pr[0]+'\','+pr[1]+')">'+pr[0]+' '+pr[1]+'W</button>';}).join('')
       +'<button type="button" class="preset" onclick="poeFill(\''+sw.id+'\',\'Custom\',\'\')">Custom</button></div>'
@@ -976,6 +1042,11 @@ function poeHTML(p){
       +'<div><label>Qty</label><input id="pd_q_'+sw.id+'" type="number" inputmode="numeric" value="1"></div></div>'
       +'<button class="btn sec" onclick="addPoeDevice(\''+sw.id+'\')">Add device</button></div>';
   });
+  h+='<div class="card"><h3>Add switch</h3>'
+    +'<div class="row"><div><label>Switch name</label><input id="poe_swname" placeholder="e.g. MDF switch"></div>'
+    +'<div><label>PoE budget (W)</label><input id="poe_budget" type="number" inputmode="decimal" placeholder="720"></div></div>'
+    +'<div class="seg"><button type="button" onclick="$(\'poe_budget\').value=720;$(\'poe_swname\').value=$(\'poe_swname\').value||\'USW-Pro-Max-48-PoE\'">Preset: USW-Pro-Max-48-PoE · 720W</button></div>'
+    +'<button class="btn" onclick="addPoeSwitch()">Add switch</button></div>';
   return h;
 }
 function poeFill(swId,name,w){$('pd_name_'+swId).value=name;
@@ -1004,7 +1075,7 @@ function subnetHTML(p){
   var rows=data.ipAssignments.filter(function(x){return x.projectId===p.id;})
     .sort(function(a,b){var x=ipToInt(a.ip),y=ipToInt(b.ip);
       return (x===null?0:x)-(y===null?0:y);});
-  var h='<div class="card"><h3>Subnet calculator</h3>'
+  var h=modHero(p,'Subnet / IP',rows.length+' assigned')+'<div class="card"><h3>Subnet calculator</h3>'
     +'<label>Network in CIDR form</label><input id="sn_cidr" placeholder="10.40.0.0/22">'
     +'<button class="btn" onclick="calcSubnet()">Calculate</button><div id="sn_out"></div></div>';
   h+='<div class="card"><h3>IP plan — this site</h3>'
@@ -1072,7 +1143,7 @@ function delIpRow(id){if(!confirm('Delete this IP assignment?'))return;
 var portEditId=null;
 function portsHTML(p){
   var sws=data.portSwitches.filter(function(s){return s.projectId===p.id;});
-  var h='<div class="card"><h3>Add switch / closet</h3>'
+  var h=modHero(p,'Port log',data.portEntries.filter(function(e){return e.projectId===p.id;}).length+' entries')+'<div class="card"><h3>Add switch / closet</h3>'
     +'<label>Name</label><input id="ps_name" placeholder="e.g. MDF — SW1">'
     +'<button class="btn" onclick="addPortSwitch()">Add switch</button></div>';
   if(!sws.length)h+='<div class="card"><p class="mut">No switches yet.</p></div>';
@@ -1136,7 +1207,7 @@ var MAT_UNITS=['each','box','pack','roll','ft','other'];
 function materialsHTML(p){
   var rows=data.materials.filter(function(m){return m.projectId===p.id;});
   var totalQty=rows.reduce(function(s,m){return s+(Number(m.qty)||0);},0);
-  var h='<div class="card"><h3>'+(matEditId?'Edit material':'Add material')+'</h3>'
+  var h=modHero(p,'Materials',rows.length+' lines · '+totalQty+' items')+'<div class="card"><h3>'+(matEditId?'Edit material':'Add material')+'</h3>'
     +matPicksHTML()
     +'<label>Item name</label><input id="mt_name" placeholder="e.g. Keystone jack">'
     +'<div class="row"><div><label>Qty</label><input id="mt_qty" type="number" inputmode="decimal" value="1"></div>'
@@ -1159,7 +1230,7 @@ function materialsHTML(p){
   return h;
 }
 function finallogHTML(p){
-  var h='<div class="card"><h3>Connectwise Notes</h3>'
+  var h=modHero(p,'Connectwise Notes',data.timeEntries.filter(function(e){return e.projectId===p.id;}).length+' entries')+'<div class="card"><h3>Connectwise Notes</h3>'
     +'<p class="mut">Time and materials for this job, formatted for ConnectWise. This section is always on.</p>'
     +'<textarea id="cw_notes" readonly style="overflow:hidden">'+esc(connectwiseNotes(p))+'</textarea>'
     +'<div class="row"><button class="btn sec" onclick="copyText(val(\'cw_notes\'))">Copy notes</button>'
@@ -1347,6 +1418,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.0',items:['Visual Dashboard redesign complete: home header (today, week chart, activity), color-banded project tiles, project interior with module tiles, new Timer and PoE screens, desktop sidebar layout','New Admin area (admins only): create users in the app, assign or remove admins, oversee every project, restore deleted projects and remove stuck members','Admin powers need a one-time setup: run migration-4.0-admin.sql in Supabase and deploy the admin Edge Function']},
  {v:'3.0.22',items:['New look, step 4: inside a project \u2014 color header band, total-time hero, module tiles, recent activity and a Start Timer button']},
  {v:'3.0.21',items:['New look, step 3: project cards are now color-banded tiles with total hours in the project\u2019s color']},
  {v:'3.0.20',items:['New look, step 2: Projects screen opens with a home header \u2014 today\u2019s time, this week\u2019s hours chart and recent activity']},
@@ -1489,6 +1561,7 @@ function onSignedIn(session,keepView){
     syncMeta.uid=uid; saveSyncMeta();
   }
   sbUser=session.user;
+  checkAdmin();
   if(!keepView){ view={name:'projects'}; curTab='overview'; }
   else if(view.name==='login'){ view={name:'projects'}; }
   render();
@@ -1503,6 +1576,7 @@ function onSignedIn(session,keepView){
 }
 function onSignedOut(){
   memberCache={};
+  isAdmin=false; adminCheckedFor=null; adminData=null;
   sbUser=null;
   if(rtChannel){ try{sb.removeChannel(rtChannel);}catch(e){} rtChannel=null; }
   if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
@@ -2038,6 +2112,112 @@ function runDiag(){
   });
 }
 
+/* ---------- admin (v4.0) ---------- */
+var isAdmin=false, adminCheckedFor=null, adminData=null;
+function checkAdmin(){
+  if(!sb||!sbUser){ isAdmin=false; return; }
+  if(adminCheckedFor===sbUser.id) return;
+  adminCheckedFor=sbUser.id;
+  sb.from('admins').select('user_id').eq('user_id',sbUser.id).maybeSingle().then(function(r){
+    isAdmin=!!(r&&r.data&&r.data.user_id);
+    renderHdrMenu();
+  },function(){ isAdmin=false; });
+}
+function loadAdminData(force){
+  if(!sb||!sbUser) return;
+  if(adminData&&adminData.loading) return;
+  if(adminData&&!adminData.error&&!force) return;
+  adminData={loading:true};
+  Promise.all([
+    sb.from('profiles').select('id,email'),
+    sb.from('admins').select('user_id'),
+    sb.from('project_members').select('project_id,user_id'),
+    sb.from('projects').select('id,name,owner_id,deleted_at,created_at')
+  ]).then(function(rs){
+    if(rs[0].error){ adminData={error:(rs[0].error.message||'Could not load admin data')}; if(view.name==='admin')render(); return; }
+    adminData={ profiles:rs[0].data||[],
+      admins:(rs[1].data||[]).map(function(a){return a.user_id;}),
+      members:rs[2].data||[], projects:rs[3].data||[] };
+    if(view.name==='admin')render();
+  },function(){ adminData={error:'Could not load admin data'}; if(view.name==='admin')render(); });
+}
+function adminFn(action,payload,doneMsg){
+  var body={action:action};
+  for(var k in payload) body[k]=payload[k];
+  sb.functions.invoke('admin',{body:body}).then(function(r){
+    if(r.error){ toast('Admin action failed: '+(r.error.message||'function error')); return; }
+    if(r.data&&r.data.error){ toast('Admin action failed: '+r.data.error); return; }
+    toast(doneMsg||'Done');
+    adminData=null;
+    if(action==='setAdmin'){ adminCheckedFor=null; checkAdmin(); }
+    if(view.name==='admin')render();
+  },function(){ toast('Admin action failed: network error'); });
+}
+function renderAdmin(){
+  if(!isAdmin){ $('app').innerHTML='<div class="card"><p class="mut">Admins only.</p></div>'; return; }
+  loadAdminData();
+  if(!adminData||adminData.loading){ $('app').innerHTML='<div class="card"><p class="mut">Loading admin data\u2026</p></div>'; return; }
+  if(adminData.error){
+    $('app').innerHTML='<div class="card"><h3>Admin</h3><div class="err">'+esc(adminData.error)+'</div>'
+      +'<p class="mut">If the admins table does not exist yet, run the v4.0 migration SQL in Supabase (SQL Editor) \u2014 it creates the table, the oversight policies, and makes you the first admin.</p></div>';
+    return;
+  }
+  var d=adminData;
+  var emailOf=function(id){ var pr=d.profiles.filter(function(x){return x.id===id;})[0];
+    return pr?pr.email:(sbUser&&id===sbUser.id?sbUser.email:String(id).slice(0,8)+'\u2026'); };
+  var h='<div style="margin:4px 2px 12px"><div style="font-size:1.55rem;font-weight:800">Admin</div>'
+    +'<div class="mut">Users, projects and repairs \u2014 visible only to admins.</div></div>';
+  h+='<div class="card"><h3>Create user</h3>'
+    +'<label>Email</label><input id="ad_email" type="email" placeholder="tech@example.com">'
+    +'<label>Temporary password</label><input id="ad_pass" type="text" placeholder="8+ characters \u2014 share it with them">'
+    +'<button class="btn" onclick="adminCreateUser()">Create user</button>'
+    +'<p class="mut">Runs through the admin Edge Function. The new user can sign in right away.</p></div>';
+  h+='<div class="card"><h3>Users ('+d.profiles.length+')</h3>';
+  d.profiles.forEach(function(pr){
+    var adm=d.admins.indexOf(pr.id)>=0;
+    var owned=d.projects.filter(function(x){return x.owner_id===pr.id;}).length;
+    var memb=d.members.filter(function(x){return x.user_id===pr.id;}).length;
+    h+='<div class="kv"><span>'+esc(pr.email)+(sbUser&&pr.id===sbUser.id?' (you)':'')
+      +'<div class="mut" style="font-size:.76rem">owns '+owned+' \u00b7 member of '+memb+'</div></span>'
+      +'<span style="display:flex;gap:6px;align-items:center;flex:0 0 auto">'
+      +(adm?tbadge('admin','#1d5c96'):'')
+      +(adm
+        ?'<button class="btn sec sml" onclick="adminSetAdmin(\''+pr.id+'\',false)">Remove admin</button>'
+        :'<button class="btn sec sml" onclick="adminSetAdmin(\''+pr.id+'\',true)">Make admin</button>')
+      +'</span></div>';
+  });
+  h+='</div>';
+  h+='<div class="card"><h3>All projects ('+d.projects.length+')</h3>';
+  d.projects.slice().sort(function(a,b){return String(b.created_at||'')<String(a.created_at||'')?-1:1;}).forEach(function(pr){
+    var mem=d.members.filter(function(x){return x.project_id===pr.id;});
+    h+='<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(pr.name)+'</b>'
+      +(pr.deleted_at?'<span class="tbadge" style="background:#a33333">deleted</span>':'')
+      +'<span class="mut">owner '+esc(emailOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</span>'
+      +(pr.deleted_at?'<button class="btn sec sml" style="margin-left:auto" onclick="adminUntombstone(\''+pr.id+'\')">Restore</button>':'')
+      +'</div>'
+      +mem.map(function(m){
+        return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0 0 14px"><span class="mut" style="flex:1">'+esc(emailOf(m.user_id))+'</span>'
+          +'<button class="btn sec sml" onclick="adminRemoveMember(\''+pr.id+'\',\''+m.user_id+'\')">Remove</button></div>';}).join('')
+      +'</div>';
+  });
+  h+='</div>';
+  $('app').innerHTML=h;
+}
+function adminCreateUser(){
+  var em=val('ad_email'), pw=val('ad_pass');
+  if(!em||pw.length<8){ toast('Email + password (8+ chars) required'); return; }
+  adminFn('createUser',{email:em,password:pw},'User created: '+em);
+}
+function adminSetAdmin(uid,make){
+  if(!make&&!confirm('Remove admin from this user?'))return;
+  adminFn('setAdmin',{userId:uid,admin:make},make?'Admin granted':'Admin removed');
+}
+function adminUntombstone(pid){ adminFn('untombstone',{projectId:pid},'Project restored'); }
+function adminRemoveMember(pid,uid){
+  if(!confirm('Remove this member from the project?'))return;
+  adminFn('removeMembership',{projectId:pid,userId:uid},'Member removed');
+}
+
 /* ---------- header menu / sharing ---------- */
 function renderHdrMenu(){
   var m=$('hdrMenu'); if(!m) return;
@@ -2051,6 +2231,7 @@ function renderHdrMenu(){
   h+='<button onclick="openImportForm()">Import project</button>'
     +'<button onclick="goBackup()">Backup / Restore</button>'
     +'<button onclick="goAbout()">About</button>';
+  if(isAdmin) h+='<button onclick="goAdmin()">Admin</button>';
   if(sbReady&&sbUser){
     h+='<div class="mut" id="syncstat" style="padding:10px 12px 2px;font-size:.78rem">'+esc(syncStatusText())+'</div>'
       +'<button onclick="openDiag()">Sync diagnostics</button>'
