@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v3.0.20
+**Current version:** v3.0.21
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v3.0.21** — New look, step 3: project cards are now color-banded tiles with total hours in the project's color.
 
 - **v3.0.20** — New look, step 2: Projects screen opens with a home header — today's time, this week's hours chart and recent activity.
 
