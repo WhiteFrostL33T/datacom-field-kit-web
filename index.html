@@ -206,7 +206,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='3.0.19';
+var APP_VERSION='3.0.20';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -403,6 +403,50 @@ function stopTimer(){
 /* ============ PROJECTS LIST ============ */
 var projTab='active';
 function setProjTab(t){projTab=t;renderProjects();}
+function homeHTML(){
+  var now=new Date();
+  var hr=now.getHours();
+  var greet=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
+  var dateStr=now.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
+  var todayKey=dayOfTs(now.getTime());
+  var tmins=0, pset={};
+  data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===todayKey){ tmins+=entryMinutes(e); pset[e.projectId]=1; } });
+  var nproj=Object.keys(pset).length;
+  var pct=Math.min(tmins/480,1);
+  var C=2*Math.PI*30;
+  var ring='<svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="30" fill="none" stroke="#343a50" stroke-width="8"/>'
+    +'<circle cx="38" cy="38" r="30" fill="none" stroke="#2dd4bf" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-pct)).toFixed(1)+'" transform="rotate(-90 38 38)"/></svg>';
+  var h='<div style="margin:4px 2px 12px"><div class="mut" style="font-size:.95rem">'+esc(dateStr)+'</div>'
+    +'<div style="font-size:1.55rem;font-weight:800;margin-top:2px">'+greet+'</div></div>';
+  h+='<div class="card" style="display:flex;align-items:center;gap:16px"><div style="flex:1;min-width:0">'
+    +'<div style="color:var(--teal);font-weight:700;font-size:.78rem;letter-spacing:.6px">ON THE CLOCK TODAY</div>'
+    +'<div style="font-size:2rem;font-weight:800;margin:4px 0">'+fmtHM(tmins)+'</div>'
+    +'<div class="mut">'+(nproj?('across '+nproj+' project'+(nproj>1?'s':'')):'No time logged yet today')+'</div>'
+    +(data.timer?'<div style="margin-top:8px"><span class="tbadge" style="background:#14302a;color:#7ce7b0">\u25cf Running \u00b7 '+esc(data.timer.kind)+' \u00b7 '+esc((projById(data.timer.projectId)||{}).name||'')+'</span></div>':'')
+    +'</div><div style="flex:0 0 auto">'+ring+'</div></div>';
+  var dow=(now.getDay()+6)%7;
+  var mon=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow);
+  var days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; var wmin=[], wmax=0, i, k, s;
+  for(i=0;i<7;i++){ var d=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i); k=dayOfTs(d.getTime()); s=0;
+    data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===k) s+=entryMinutes(e); });
+    wmin.push(s); if(s>wmax)wmax=s; }
+  h+='<div class="card"><div class="cardhd"><h3>Hours this week</h3></div><div style="display:flex;align-items:flex-end;gap:6px;padding-top:2px">';
+  for(i=0;i<7;i++){ var bh=wmax?Math.max(5,Math.round(wmin[i]/wmax*72)):5; var isToday=i===dow;
+    h+='<div style="flex:1;text-align:center"><div class="mut" style="font-size:.7rem;height:14px">'+(wmin[i]?(Math.round(wmin[i]/6)/10):'')+'</div>'
+      +'<div style="height:78px;display:flex;align-items:flex-end;justify-content:center"><div style="width:26px;height:'+bh+'px;border-radius:7px;background:'+(isToday?'var(--accent)':'#3a405e')+'"></div></div>'
+      +'<div class="mut" style="font-size:.72rem;margin-top:5px;'+(isToday?'color:var(--text);font-weight:700':'')+'">'+days[i]+'</div></div>'; }
+  h+='</div></div>';
+  var ev=[];
+  data.timeEntries.forEach(function(e){ var t=new Date(e.startISO).getTime(); ev.push({t:isFinite(t)?t:0,type:'time',e:e}); });
+  data.pulls.forEach(function(p){ var t=p.createdAt||(p.date?new Date(p.date+'T12:00:00').getTime():0); ev.push({t:isFinite(t)?t:0,type:'pull',e:p}); });
+  data.materials.forEach(function(m){ ev.push({t:m.createdAt||0,type:'mat',e:m}); });
+  ev.sort(function(a,b){return b.t-a.t;}); ev=ev.slice(0,5);
+  h+='<div class="card"><div class="cardhd"><h3>Recent activity</h3></div>';
+  if(!ev.length) h+='<p class="mut">Nothing yet \u2014 log time, cable or materials and it will show up here.</p>';
+  ev.forEach(function(it){ h+=feedItem(it); });
+  h+='</div>';
+  return h;
+}
 function renderProjects(){
   var h='<div id="projForm" style="display:none"><div class="card"><h3>New project</h3>'
     +'<label>Project name *</label><input id="np_name" placeholder="e.g. Lobby camera install">'
@@ -419,6 +463,7 @@ function renderProjects(){
     +'<input id="ip_file" type="file" accept=".json,.txt,application/json,text/plain">'
     +'<button class="btn sec" onclick="importProjectFile()">Import project</button>'
     +'<div id="ip_msg"></div></div></div>';
+  h+=homeHTML();
   var shown=[];
   if(data.projects.length){
     var nA=data.projects.filter(function(p){return (p.status||'active')!=='done';}).length;
@@ -1259,6 +1304,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'3.0.20',items:['New look, step 2: Projects screen opens with a home header \u2014 today\u2019s time, this week\u2019s hours chart and recent activity']},
  {v:'3.0.19',items:['New look, step 1 of the Visual Dashboard redesign: refreshed colors and pill tab bar']},
  {v:'3.0.18',items:['Importing a project now always makes a fresh copy with new IDs (fixes sync conflicts with the original project)']},
  {v:'3.0.17',items:['Fixed sync: projects stuck only on a device (never uploaded) now heal themselves and upload instead of failing every sync']},
