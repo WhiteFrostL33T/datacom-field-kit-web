@@ -246,7 +246,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.1.1';
+var APP_VERSION='4.2';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -309,7 +309,8 @@ var view={name:'projects'};
 var curTab='overview';
 function goProjects(){projTab='active';view={name:'projects'};render();}
 function goTimer(){view={name:'timer'};render();}
-function goDashboard(){view={name:'dashboard'};render();}
+function goActivity(){view={name:'dashboard'};render();}
+function goDashboard(){goActivity();}
 function goBackup(){view={name:'backup'};render();}
 function goAbout(){view={name:'about'};render();}
 function goAdmin(){view={name:'admin'};render();}
@@ -325,7 +326,7 @@ function openImportForm(){
 var TABDEF=[
  {id:'projects',label:'Projects',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>'},
  {id:'timer',label:'Timer',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>'},
- {id:'dashboard',label:'Dashboard',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>'}];
+ {id:'dashboard',label:'Activity',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>'}];
 var TRASH_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
 var PLUS_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>';
 var GEAR_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
@@ -342,7 +343,7 @@ var MODICONS={
 function renderDeskSide(){
   var el=$('deskSide'); if(!el) return;
   if(sbReady&&!sbUser){ el.innerHTML=''; return; }
-  var nav=[['dashboard','Dashboard','goDashboard()'],['projects','Projects','goProjects()'],['timer','Timer','goTimer()']];
+  var nav=[['projects','Projects','goProjects()'],['timer','Timer','goTimer()'],['dashboard','Activity','goActivity()']];
   var h='<div style="display:flex;align-items:center;gap:10px;padding:2px 6px 18px"><img src="logo.png" alt="" style="width:40px;height:40px;border-radius:10px;flex:0 0 auto"><div><div style="font-weight:800;font-size:1.05rem;line-height:1.1">Field Kit</div><div class="mut" style="font-size:.8rem">Datacom</div></div></div>';
   nav.forEach(function(n){
     h+='<button class="dsnav'+(view.name===n[0]?' act':'')+'" onclick="'+n[2]+'">'+n[1]+'</button>';
@@ -389,7 +390,7 @@ function render(skipTrack){
   if(sbReady&&!sbUser){ renderLogin(); return; }
   $('hdrsub').textContent=view.name==='projects'?'Projects':
     view.name==='timer'?'Timer':
-    view.name==='dashboard'?'Dashboard':
+    view.name==='dashboard'?'Activity':
     view.name==='backup'?'Backup / Restore':
     view.name==='about'?'About':
     view.name==='admin'?'Admin':
@@ -553,12 +554,15 @@ function homeHTML(){
     +stat('var(--org)','CABLE THIS WEEK',cft.toLocaleString()+' ft',(cn?cn+' pull'+(cn>1?'s':'')+' logged':'No pulls this week'))
     +stat('var(--pnk)','ACTIVE PROJECTS',String(nAct),(nDone?nDone+' completed':'None completed yet'))
     +'</div>';
-  var chartH='<div class="card"><div class="cardhd"><h3>Hours this week</h3></div><div style="display:flex;align-items:flex-end;gap:6px;padding-top:2px">';
-  for(i=0;i<7;i++){ var bh=wmax?Math.max(5,Math.round(wmin[i]/wmax*72)):5; var isToday=i===dow;
-    chartH+='<div style="flex:1;text-align:center"><div class="mut" style="font-size:.7rem;height:14px">'+(wmin[i]?(Math.round(wmin[i]/6)/10):'')+'</div>'
-      +'<div style="height:78px;display:flex;align-items:flex-end;justify-content:center"><div style="width:26px;height:'+bh+'px;border-radius:7px;background:'+(isToday?'var(--accent)':'#3a405e')+'"></div></div>'
-      +'<div class="mut" style="font-size:.72rem;margin-top:5px;'+(isToday?'color:var(--text);font-weight:700':'')+'">'+days[i]+'</div></div>'; }
-  chartH+='</div></div>';
+  var chartHTML=function(maxH){
+    var cH='<div class="card"><div class="cardhd"><h3>Hours this week</h3></div><div style="display:flex;align-items:flex-end;gap:6px;padding-top:2px">';
+    for(var j=0;j<7;j++){ var bh=wmax?Math.max(5,Math.round(wmin[j]/wmax*maxH)):5; var isT=j===dow;
+      cH+='<div style="flex:1;text-align:center"><div class="mut" style="font-size:.7rem;height:14px">'+(wmin[j]?(Math.round(wmin[j]/6)/10):'')+'</div>'
+        +'<div style="height:'+(maxH+6)+'px;display:flex;align-items:flex-end;justify-content:center"><div style="width:26px;height:'+bh+'px;border-radius:7px;background:'+(isT?'var(--accent)':'#3a405e')+'"></div></div>'
+        +'<div class="mut" style="font-size:.72rem;margin-top:5px;'+(isT?'color:var(--text);font-weight:700':'')+'">'+days[j]+'</div></div>'; }
+    return cH+'</div></div>';
+  };
+  var chartH=chartHTML(72), chartHD=chartHTML(210);
   var ev=[];
   data.timeEntries.forEach(function(e){ var t=new Date(e.startISO).getTime(); ev.push({t:isFinite(t)?t:0,type:'time',e:e}); });
   data.pulls.forEach(function(p){ var t=p.createdAt||(p.date?new Date(p.date+'T12:00:00').getTime():0); ev.push({t:isFinite(t)?t:0,type:'pull',e:p}); });
@@ -570,7 +574,7 @@ function homeHTML(){
   actH+='</div>';
   h+='<div class="mobi">'+chartH+'</div>';
   h+='<div class="mobi">'+actH+'</div>';
-  h+='<div class="deskonly deskHome2">'+chartH+actH+'</div>';
+  h+='<div class="deskonly deskHome2">'+chartHD+actH+'</div>';
   return h;
 }
 function renderProjects(){
@@ -1488,7 +1492,7 @@ function renderDashboard(){
   data.materials.forEach(function(m){ev.push({t:m.createdAt||0,type:'mat',e:m});});
   ev.sort(function(a,b){return b.t-a.t;});
   ev=ev.slice(0,40);
-  var h='<div class="card"><h3>Recent activity</h3>';
+  var h='<div class="card"><h3>Activity log</h3>';
   if(!ev.length)h+='<p class="mut">Nothing yet \u2014 log time, cable or materials and it will show up here.</p>';
   var lastDay='',now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
   ev.forEach(function(it){
@@ -1501,6 +1505,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.2',items:['The Dashboard tab is now called Activity \u2014 it is the activity log \u2014 and it sits below Projects and Timer in the sidebar','Desktop: the Hours this week chart is taller now, so its card no longer has dead space']},
  {v:'4.1.1',items:['Fix: materials without a unit no longer print "(undefined)" in Connectwise Notes (single-entry copy and full export)']},
  {v:'4.1',items:['Desktop layout now matches the design: left sidebar with your projects and sync status, project search, stat cards (today, this week, cable this week, active projects) and chart + activity side by side on wide screens']},
  {v:'4.0',items:['Visual Dashboard redesign complete: home header (today, week chart, activity), color-banded project tiles, project interior with module tiles, new Timer and PoE screens, desktop sidebar layout','New Admin area (admins only): create users in the app, assign or remove admins, oversee every project, restore deleted projects and remove stuck members','Admin powers need a one-time setup: run migration-4.0-admin.sql in Supabase and deploy the admin Edge Function']},
