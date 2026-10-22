@@ -246,7 +246,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.1';
+var APP_VERSION='4.1.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1335,7 +1335,7 @@ function matsForEntry(e){
   if(!ons.length||ons[ons.length-1].id!==e.id) return [];
   return data.materials.filter(function(m){ return m.projectId===e.projectId&&dayOfTs(m.createdAt)===day; });
 }
-function matLine(m){ return m.qty+' x '+m.name+' ('+m.unit+')'+(m.notes?'  \u2014  '+m.notes:''); }
+function matLine(m){ return m.qty+' x '+m.name+(m.unit?' ('+m.unit+')':'')+(m.notes?'  \u2014  '+m.notes:''); }
 function entryCopyListHTML(p){
   var entries=data.timeEntries.filter(function(e){return e.projectId===p.id;})
     .sort(function(a,b){return a.startISO<b.startISO?1:-1;});
@@ -1412,7 +1412,7 @@ function connectwiseNotes(p){
   var mats=data.materials.filter(function(m){return m.projectId===p.id;});
   if(!mats.length)L.push('No materials logged.');
   else mats.forEach(function(m){
-    L.push(m.qty+' x '+m.name+' ('+m.unit+')'+(m.notes?'  —  '+m.notes:''));});
+    L.push(m.qty+' x '+m.name+(m.unit?' ('+m.unit+')':'')+(m.notes?'  —  '+m.notes:''));});
   return L.join('\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
 }
 function matPick(name,unit){$('mt_name').value=name;$('mt_unit').value=unit;$('mt_qty').focus();}
@@ -1501,6 +1501,7 @@ function renderDashboard(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.1.1',items:['Fix: materials without a unit no longer print "(undefined)" in Connectwise Notes (single-entry copy and full export)']},
  {v:'4.1',items:['Desktop layout now matches the design: left sidebar with your projects and sync status, project search, stat cards (today, this week, cable this week, active projects) and chart + activity side by side on wide screens']},
  {v:'4.0',items:['Visual Dashboard redesign complete: home header (today, week chart, activity), color-banded project tiles, project interior with module tiles, new Timer and PoE screens, desktop sidebar layout','New Admin area (admins only): create users in the app, assign or remove admins, oversee every project, restore deleted projects and remove stuck members','Admin powers need a one-time setup: run migration-4.0-admin.sql in Supabase and deploy the admin Edge Function']},
  {v:'3.0.22',items:['New look, step 4: inside a project \u2014 color header band, total-time hero, module tiles, recent activity and a Start Timer button']},
