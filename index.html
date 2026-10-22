@@ -250,7 +250,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.3.2';
+var APP_VERSION='4.4';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -864,6 +864,14 @@ function tbadge(label,color){
 }
 function cwTag(p){ return p&&p.ticket?' <span class="tbadge" style="background:#1d5c96">CW #'+esc(p.ticket)+'</span>':''; }
 function cwSuffix(p){ return p&&p.ticket?' \u00b7 CW #'+esc(p.ticket):''; }
+function profLabel(pr){ if(!pr) return ''; var n=String(pr.display_name||'').trim(); return n||pr.email||''; }
+function profilesQ(ids,orderEmail){
+  function build(cols){ var q=sb.from('profiles').select(cols); if(ids)q=q.in('id',ids); if(orderEmail)q=q.order('email'); return q; }
+  return build('id,email,display_name').then(function(r){
+    if(!r.error) return r;
+    return build('id,email');
+  });
+}
 function loadMembers(pid,force){
   var p=projById(pid); if(!p||!sb||!sbUser) return;
   var c=memberCache[pid];
@@ -874,11 +882,11 @@ function loadMembers(pid,force){
     if(r.error){ memberCache[pid]={failed:true}; if(view.name==='project'&&view.id===pid)render(); return; }
     var ids=(r.data||[]).map(function(m){return m.user_id;});
     var ownerId=p.owner_id||sbUser.id;
-    sb.from('profiles').select('id,email').in('id',ids.concat([ownerId])).then(function(r2){
-      var emails={}; (r2.data||[]).forEach(function(pr){emails[pr.id]=pr.email;});
-      memberCache[pid]={ownerId:ownerId,ownerEmail:emails[ownerId]||'you',
+    profilesQ(ids.concat([ownerId])).then(function(r2){
+      var labels={}; (r2.data||[]).forEach(function(pr){labels[pr.id]=profLabel(pr);});
+      memberCache[pid]={ownerId:ownerId,ownerLabel:labels[ownerId]||'you',
         members:(r.data||[]).filter(function(m){return m.user_id!==ownerId;})
-          .map(function(m){return{id:m.user_id,email:emails[m.user_id]||String(m.user_id).slice(0,8)+'…'};})};
+          .map(function(m){return{id:m.user_id,label:labels[m.user_id]||String(m.user_id).slice(0,8)+'…'};})};
       if(view.name==='project'&&view.id===pid)render();
     });
   });
@@ -888,9 +896,9 @@ function techCardHTML(p){
   var h='<div class="card"><div class="cardhd"><h3>Technicians</h3></div>';
   var shown=false;
   if(mc&&!mc.loading&&!mc.failed){
-    h+='<div class="kv"><span>'+esc(mc.ownerEmail)+'</span>'+tbadge('owner','#1d5c96')+'</div>';
+    h+='<div class="kv"><span>'+esc(mc.ownerLabel||mc.ownerEmail||'')+'</span>'+tbadge('owner','#1d5c96')+'</div>';
     mc.members.forEach(function(m){
-      h+='<div class="kv"><span>'+esc(m.email)+'</span>'+tbadge('member','#2a4a63')+'</div>';
+      h+='<div class="kv"><span>'+esc(m.label||m.email||'')+'</span>'+tbadge('member','#2a4a63')+'</div>';
     });
     shown=true;
   }
@@ -1513,6 +1521,7 @@ function renderActivity(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.4',items:['Admins can set a display name for each user (Admin \u2192 Users \u2192 Set name). Names then show instead of emails in the share picker, project Technicians and Admin','One-time setup: run migration-4.4-display-names.sql in Supabase and re-deploy the admin Edge Function']},
  {v:'4.3.2',items:['Desktop: Hours this week and Recent activity are now stacked full-width on the Dashboard instead of side by side']},
  {v:'4.3.1',items:['Desktop: removed the empty space at the top \u2014 content now starts at the top of the window with just the \u22ef button floating in the corner','Desktop: the Hours this week card no longer stretches with a gap underneath, and long notes in Recent activity are trimmed to two lines (the full text is still on the Activity tab)']},
  {v:'4.3',items:['New Dashboard screen: the greeting, today/week stats, hours chart and recent activity now live on their own Dashboard tab \u2014 and the app opens on it','Projects is now just your projects, with the search and New Project button at the top','Done projects are now called Closed','Desktop: the top bar is gone (the sidebar carries the name and logo now); the \u22ef menu stays in the top-right corner']},
@@ -2214,7 +2223,7 @@ function runDiag(){
 }
 
 /* ---------- admin (v4.0) ---------- */
-var isAdmin=false, adminCheckedFor=null, adminData=null;
+var isAdmin=false, adminCheckedFor=null, adminData=null, adminNameEdit=null;
 function checkAdmin(){
   if(!sb||!sbUser){ isAdmin=false; return; }
   if(adminCheckedFor===sbUser.id) return;
@@ -2230,7 +2239,7 @@ function loadAdminData(force){
   if(adminData&&!adminData.error&&!force) return;
   adminData={loading:true};
   Promise.all([
-    sb.from('profiles').select('id,email'),
+    profilesQ(null,false),
     sb.from('admins').select('user_id'),
     sb.from('project_members').select('project_id,user_id'),
     sb.from('projects').select('id,name,owner_id,deleted_at,created_at')
@@ -2264,8 +2273,8 @@ function renderAdmin(){
     return;
   }
   var d=adminData;
-  var emailOf=function(id){ var pr=d.profiles.filter(function(x){return x.id===id;})[0];
-    return pr?pr.email:(sbUser&&id===sbUser.id?sbUser.email:String(id).slice(0,8)+'\u2026'); };
+  var labelOf=function(id){ var pr=d.profiles.filter(function(x){return x.id===id;})[0];
+    return pr?profLabel(pr):(sbUser&&id===sbUser.id?sbUser.email:String(id).slice(0,8)+'\u2026'); };
   var h='<div style="margin:4px 2px 12px"><div style="font-size:1.55rem;font-weight:800">Admin</div>'
     +'<div class="mut">Users, projects and repairs \u2014 visible only to admins.</div></div>';
   h+='<div class="card"><h3>Create user</h3>'
@@ -2278,14 +2287,22 @@ function renderAdmin(){
     var adm=d.admins.indexOf(pr.id)>=0;
     var owned=d.projects.filter(function(x){return x.owner_id===pr.id;}).length;
     var memb=d.members.filter(function(x){return x.user_id===pr.id;}).length;
-    h+='<div class="kv"><span>'+esc(pr.email)+(sbUser&&pr.id===sbUser.id?' (you)':'')
-      +'<div class="mut" style="font-size:.76rem">owns '+owned+' \u00b7 member of '+memb+'</div></span>'
+    var nm=(pr.display_name||'').trim();
+    h+='<div class="kv"><span>'+(nm?('<b>'+esc(nm)+'</b>'):esc(pr.email))+(sbUser&&pr.id===sbUser.id?' (you)':'')
+      +'<div class="mut" style="font-size:.76rem">'+(nm?esc(pr.email)+' \u00b7 ':'')+'owns '+owned+' \u00b7 member of '+memb+'</div></span>'
       +'<span style="display:flex;gap:6px;align-items:center;flex:0 0 auto">'
       +(adm?tbadge('admin','#1d5c96'):'')
+      +'<button class="btn sec sml" onclick="adminEditName(\''+pr.id+'\')">'+(nm?'Edit name':'Set name')+'</button>'
       +(adm
         ?'<button class="btn sec sml" onclick="adminSetAdmin(\''+pr.id+'\',false)">Remove admin</button>'
         :'<button class="btn sec sml" onclick="adminSetAdmin(\''+pr.id+'\',true)">Make admin</button>')
       +'</span></div>';
+    if(adminNameEdit===pr.id){
+      h+='<div style="display:flex;gap:6px;align-items:center;padding:2px 0 10px">'
+        +'<input id="ad_name_'+pr.id+'" value="'+esc(nm)+'" placeholder="Display name (blank clears it)" style="flex:1;margin:0">'
+        +'<button class="btn sml" onclick="adminSaveName(\''+pr.id+'\')">Save</button>'
+        +'<button class="btn sec sml" onclick="adminCancelName()">Cancel</button></div>';
+    }
   });
   h+='</div>';
   h+='<div class="card"><h3>All projects ('+d.projects.length+')</h3>';
@@ -2293,11 +2310,11 @@ function renderAdmin(){
     var mem=d.members.filter(function(x){return x.project_id===pr.id;});
     h+='<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(pr.name)+'</b>'
       +(pr.deleted_at?'<span class="tbadge" style="background:#a33333">deleted</span>':'')
-      +'<span class="mut">owner '+esc(emailOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</span>'
+      +'<span class="mut">owner '+esc(labelOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</span>'
       +(pr.deleted_at?'<button class="btn sec sml" style="margin-left:auto" onclick="adminUntombstone(\''+pr.id+'\')">Restore</button>':'')
       +'</div>'
       +mem.map(function(m){
-        return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0 0 14px"><span class="mut" style="flex:1">'+esc(emailOf(m.user_id))+'</span>'
+        return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0 0 14px"><span class="mut" style="flex:1">'+esc(labelOf(m.user_id))+'</span>'
           +'<button class="btn sec sml" onclick="adminRemoveMember(\''+pr.id+'\',\''+m.user_id+'\')">Remove</button></div>';}).join('')
       +'</div>';
   });
@@ -2317,6 +2334,13 @@ function adminUntombstone(pid){ adminFn('untombstone',{projectId:pid},'Project r
 function adminRemoveMember(pid,uid){
   if(!confirm('Remove this member from the project?'))return;
   adminFn('removeMembership',{projectId:pid,userId:uid},'Member removed');
+}
+function adminEditName(uid){ adminNameEdit=uid; render(); }
+function adminCancelName(){ adminNameEdit=null; render(); }
+function adminSaveName(uid){
+  var v=val('ad_name_'+uid);
+  adminNameEdit=null;
+  adminFn('setDisplayName',{userId:uid,displayName:v},'Name saved');
 }
 
 /* ---------- header menu / sharing ---------- */
@@ -2367,12 +2391,12 @@ function loadShareList(){
     var ids=(r.data||[]).map(function(m){ return m.user_id; });
     var ownerId=p.owner_id||sbUser.id;
     var allIds=ids.concat([ownerId]);
-    sb.from('profiles').select('id,email').in('id',allIds).then(function(r2){
-      var emails={}; (r2.data||[]).forEach(function(pr){ emails[pr.id]=pr.email; });
-      var h='<div class="kv"><span>'+esc(emails[ownerId]||'you')+'</span><span class="mut">owner</span></div>';
+    profilesQ(allIds).then(function(r2){
+      var labels={}; (r2.data||[]).forEach(function(pr){ labels[pr.id]=profLabel(pr); });
+      var h='<div class="kv"><span>'+esc(labels[ownerId]||'you')+'</span><span class="mut">owner</span></div>';
       (r.data||[]).forEach(function(m){
         if(m.user_id===ownerId) return;
-        h+='<div class="kv"><span>'+esc(emails[m.user_id]||m.user_id.slice(0,8)+'…')+'</span>'
+        h+='<div class="kv"><span>'+esc(labels[m.user_id]||m.user_id.slice(0,8)+'…')+'</span>'
           +'<button class="iconbtn" aria-label="Remove member" onclick="removeMember(\''+m.user_id+'\')">'+TRASH_SVG+'</button></div>';
       });
       box.innerHTML=h;
@@ -2383,13 +2407,15 @@ function loadShareList(){
 var shareSel={};
 function loadInviteList(memberIds,ownerId){
   var box=document.getElementById('share_invite'); if(!box||!sb) return;
-  sb.from('profiles').select('id,email').order('email').then(function(r){
+  profilesQ(null,true).then(function(r){
     if(r.error){ box.innerHTML='<div class="err">Could not load users.</div>'; return; }
     var users=(r.data||[]).filter(function(u){
       return u.id!==sbUser.id&&u.id!==ownerId&&memberIds.indexOf(u.id)<0;});
     if(!users.length){ box.innerHTML='<p class="mut">Everyone already has access.</p>'; updateInviteBtn(); return; }
     box.innerHTML=users.map(function(u){
-      return '<label class="kv" style="cursor:pointer;align-items:center"><span style="display:flex;align-items:center;gap:10px"><input type="checkbox"'+(shareSel[u.id]?' checked':'')+' onchange="toggleShareSel(\''+u.id+'\',this.checked)" style="width:22px;height:22px;margin:0;padding:0;flex:0 0 auto;accent-color:#2f7fc4">'+esc(u.email||'')+'</span></label>';
+      var nm=(u.display_name||'').trim();
+      var who=nm?('<span><b>'+esc(nm)+'</b><div class="mut" style="font-size:.76rem">'+esc(u.email||'')+'</div></span>'):esc(u.email||'');
+      return '<label class="kv" style="cursor:pointer;align-items:center"><span style="display:flex;align-items:center;gap:10px"><input type="checkbox"'+(shareSel[u.id]?' checked':'')+' onchange="toggleShareSel(\''+u.id+'\',this.checked)" style="width:22px;height:22px;margin:0;padding:0;flex:0 0 auto;accent-color:#2f7fc4">'+who+'</span></label>';
     }).join('');
     updateInviteBtn();
   });
