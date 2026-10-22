@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v4.4
+**Current version:** v4.4.1
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v4.4.1** — Desktop: content stretches the full width of the window on every page - no more empty gap on the right of wide screens
 
 - **v4.4** — Admins can set a display name per user (Admin > Users > Set name); names show instead of emails in sharing, Technicians and Admin. One-time setup: run migration-4.4-display-names.sql and re-deploy the admin Edge Function
 

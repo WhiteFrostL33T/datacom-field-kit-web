@@ -160,7 +160,7 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
 .dssync{display:flex;align-items:center;gap:8px;background:#14302a;color:#7ce7b0;border-radius:12px;
   padding:11px 13px;font-size:.86rem;font-weight:600;}
 @media (min-width:1024px){
-  main{max-width:1180px;margin-left:240px;margin-right:auto;padding:22px 26px 60px;}
+  main{max-width:none;margin-left:240px;margin-right:0;padding:22px 26px 60px;}
   header{position:fixed;top:0;right:0;left:auto;background:transparent;box-shadow:none;padding:10px 16px;pointer-events:none;}
   header .ttl{display:none !important;}
   header .hdrmenu{pointer-events:auto;margin-left:auto;}
@@ -250,7 +250,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.4';
+var APP_VERSION='4.4.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1521,6 +1521,7 @@ function renderActivity(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.4.1',items:['Desktop: content now stretches the full width of the window on every page - no more empty gap on the right of wide screens']},
  {v:'4.4',items:['Admins can set a display name for each user (Admin \u2192 Users \u2192 Set name). Names then show instead of emails in the share picker, project Technicians and Admin','One-time setup: run migration-4.4-display-names.sql in Supabase and re-deploy the admin Edge Function']},
  {v:'4.3.2',items:['Desktop: Hours this week and Recent activity are now stacked full-width on the Dashboard instead of side by side']},
  {v:'4.3.1',items:['Desktop: removed the empty space at the top \u2014 content now starts at the top of the window with just the \u22ef button floating in the corner','Desktop: the Hours this week card no longer stretches with a gap underneath, and long notes in Recent activity are trimmed to two lines (the full text is still on the Activity tab)']},
