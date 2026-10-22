@@ -252,7 +252,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.5.1';
+var APP_VERSION='4.5.2';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1540,6 +1540,7 @@ function renderActivity(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.5.2',items:['Sync fix: projects shared with you after your last sync now actually arrive (the pull checks the full project list, not just recently-changed ones), with their existing time, pulls and materials; a project you are removed from now leaves your device on the next sync']},
  {v:'4.5.1',items:['Dashboard week chart labels now show the exact hours (7.25, 7.5, 7.75) instead of rounding to one decimal (7.3)']},
  {v:'4.5',items:['Admin: projects can be deleted permanently from the server (menu on each project - with a record count before you confirm); purged projects remove themselves from every device on its next sync','Admin: all user and project actions now live under the three-dot menu on each row, and Create user moved to the floating + button','One-time setup: run migration-4.5-purge.sql in Supabase and re-deploy the admin Edge Function']},
  {v:'4.4.2',items:['Sync fix: settings for a deleted project could block every sync with a server security error - they are now skipped, a refused settings row no longer stops the rest of the sync, and the 3 projects waiting on the server can come down']},
@@ -2127,7 +2128,66 @@ function pullChanges(){
   var since=syncMeta.lastPull||'1970-01-01T00:00:00.000Z';
   var changed=false;
   var jobs=[];
+  // Projects are pulled in FULL, never incrementally: being granted
+  // membership does not bump a project's updated_at, so a timestamp
+  // pull silently skips projects shared with you after your last sync
+  // (Braeden, 2026-10-22: member of 8, phone held 5, syncs "fine").
+  // The visible list is small - reconcile it on every sync.
+  var cfgOf=function(key){ for(var i=0;i<SYNC_TABLES.length;i++) if(SYNC_TABLES[i].key===key) return SYNC_TABLES[i]; return null; };
+  var projCfg=cfgOf('projects');
+  jobs.push(sb.from('projects').select('*').then(function(r){
+    if(r.error) throw r.error;
+    var rows=r.data||[], visible={}, newPids=[];
+    rows.forEach(function(row){
+      visible[row.id]=1;
+      var isNew=!row.deleted_at&&idxById(data.projects,row.id)<0;
+      if(mergeRow(projCfg,row)) changed=true;
+      if(isNew) newPids.push(row.id);
+    });
+    // Absence = gone: membership removed, deleted on another device,
+    // or admin-purged. Push ran before pull, so a local project was
+    // already offered to the server - if it is not visible now, it is
+    // not ours to keep. An empty list against a non-empty snapshot is
+    // suspect, though: prune nothing then.
+    var snapCount=((lastSynced&&lastSynced.projects)||[]).length;
+    if(rows.length||!snapCount){
+      (data.projects||[]).slice().forEach(function(p){
+        if(!visible[p.id]){
+          pruneLocalProject(p.id); changed=true;
+          syncNote='A project that is no longer shared with you was removed from this device';
+        }
+      });
+    }
+    if(!newPids.length) return;
+    // Backfill: a just-arrived project's rows predate lastPull, so the
+    // incremental pulls below skip them. Fetch its data once, in full.
+    var bf=[];
+    newPids.forEach(function(pid){
+      ['timeEntries','pulls','materials','ipAssignments','poeSwitches','portSwitches'].forEach(function(k){
+        var cfg=cfgOf(k);
+        bf.push(sb.from(cfg.table).select('*').eq('project_id',pid).then(function(rr){
+          if(rr.error) throw rr.error;
+          (rr.data||[]).forEach(function(row){ if(mergeRow(cfg,row)) changed=true; });
+        }));
+      });
+    });
+    return Promise.all(bf).then(function(){
+      var bf2=[];
+      data.poeSwitches.concat(data.portSwitches).forEach(function(s){
+        if(newPids.indexOf(s.projectId)<0) return;
+        ['poeDevices','portEntries'].forEach(function(k){
+          var cfg=cfgOf(k);
+          bf2.push(sb.from(cfg.table).select('*').eq('switch_id',s.id).then(function(rr){
+            if(rr.error) throw rr.error;
+            (rr.data||[]).forEach(function(row){ if(mergeRow(cfg,row)) changed=true; });
+          }));
+        });
+      });
+      return Promise.all(bf2);
+    });
+  }));
   SYNC_TABLES.forEach(function(cfg){
+    if(cfg.table==='projects') return;
     jobs.push(sb.from(cfg.table).select('*').gt('updated_at',since).then(function(r){
       if(r.error) throw r.error;
       (r.data||[]).forEach(function(row){ if(mergeRow(cfg,row)) changed=true; });
