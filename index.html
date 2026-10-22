@@ -182,7 +182,7 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
   .deskflex{display:flex;}
   .deskStats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px;}
   .deskStats .card{margin:0;}
-  .deskHome2{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;align-items:start;}
+  .deskHome2{display:grid;grid-template-columns:1fr;gap:12px;align-items:start;}
   .deskHome2 .card{margin:0;}
 }
 </style>
@@ -250,7 +250,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.3.1';
+var APP_VERSION='4.3.2';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1513,6 +1513,7 @@ function renderActivity(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.3.2',items:['Desktop: Hours this week and Recent activity are now stacked full-width on the Dashboard instead of side by side']},
  {v:'4.3.1',items:['Desktop: removed the empty space at the top \u2014 content now starts at the top of the window with just the \u22ef button floating in the corner','Desktop: the Hours this week card no longer stretches with a gap underneath, and long notes in Recent activity are trimmed to two lines (the full text is still on the Activity tab)']},
  {v:'4.3',items:['New Dashboard screen: the greeting, today/week stats, hours chart and recent activity now live on their own Dashboard tab \u2014 and the app opens on it','Projects is now just your projects, with the search and New Project button at the top','Done projects are now called Closed','Desktop: the top bar is gone (the sidebar carries the name and logo now); the \u22ef menu stays in the top-right corner']},
  {v:'4.2',items:['The Dashboard tab is now called Activity \u2014 it is the activity log \u2014 and it sits below Projects and Timer in the sidebar','Desktop: the Hours this week chart is taller now, so its card no longer has dead space']},
