@@ -142,6 +142,8 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
 .cardmenu .cmenu button{display:block;width:100%;text-align:left;background:none;border:none;
   padding:13px 14px;font-size:.95rem;cursor:pointer;color:var(--text);}
 .cardmenu .cmenu button.danger{color:var(--red);}
+.btn.danger{background:#a33333;color:#fff;}
+.btn.danger:disabled{opacity:.45;}
 .hdrmenu{position:relative;flex:0 0 auto;}
 .hdrmenu .cmenu{position:absolute;top:calc(100% + 6px);right:0;background:var(--panel2);
   border:1px solid var(--line);border-radius:12px;z-index:60;min-width:170px;overflow:hidden;
@@ -250,7 +252,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.4.2';
+var APP_VERSION='4.5';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -665,6 +667,23 @@ function createProject(){
     ticket:val('np_ticket'),notes:val('np_notes'),status:'active',technicians:[],
     enabledModules:DEFAULT_MODULES.slice()});
   save();render();toast('Project created');}
+function pruneLocalProject(id){
+  // Remove a project and all its local data without touching the server.
+  // Used when an admin purge (here or on another device) deletes it.
+  data.projects=data.projects.filter(function(p){return p.id!==id;});
+  data.timeEntries=data.timeEntries.filter(function(e){return e.projectId!==id;});
+  data.pulls=data.pulls.filter(function(x){return x.projectId!==id;});
+  data.materials=data.materials.filter(function(x){return x.projectId!==id;});
+  data.ipAssignments=data.ipAssignments.filter(function(x){return x.projectId!==id;});
+  var sw=data.poeSwitches.filter(function(s){return s.projectId===id;}).map(function(s){return s.id;});
+  data.poeDevices=data.poeDevices.filter(function(d){return sw.indexOf(d.switchId)<0;});
+  data.poeSwitches=data.poeSwitches.filter(function(s){return s.projectId!==id;});
+  var pw=data.portSwitches.filter(function(s){return s.projectId===id;}).map(function(s){return s.id;});
+  data.portEntries=data.portEntries.filter(function(d){return pw.indexOf(d.switchId)<0;});
+  data.portSwitches=data.portSwitches.filter(function(s){return s.projectId!==id;});
+  delete data.storageCalcs[id];delete data.ipSubnets[id];
+  if(data.timer&&data.timer.projectId===id)data.timer=null;
+}
 function delProject(id){
   var _p=projById(id);
   var _mine=!_p||!_p.owner_id||!sbUser||_p.owner_id===sbUser.id;
@@ -1521,6 +1540,7 @@ function renderActivity(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.5',items:['Admin: projects can be deleted permanently from the server (menu on each project - with a record count before you confirm); purged projects remove themselves from every device on its next sync','Admin: all user and project actions now live under the three-dot menu on each row, and Create user moved to the floating + button','One-time setup: run migration-4.5-purge.sql in Supabase and re-deploy the admin Edge Function']},
  {v:'4.4.2',items:['Sync fix: settings for a deleted project could block every sync with a server security error - they are now skipped, a refused settings row no longer stops the rest of the sync, and the 3 projects waiting on the server can come down']},
  {v:'4.4.1',items:['Desktop: content now stretches the full width of the window on every page - no more empty gap on the right of wide screens']},
  {v:'4.4',items:['Admins can set a display name for each user (Admin \u2192 Users \u2192 Set name). Names then show instead of emails in the share picker, project Technicians and Admin','One-time setup: run migration-4.4-display-names.sql in Supabase and re-deploy the admin Edge Function']},
@@ -1891,23 +1911,29 @@ function reconcileSnapshot(base){
     if(r.error||!r.data) return base;
     var server={}; r.data.forEach(function(x){ server[x.id]=1; });
     var localById={}; (data.projects||[]).forEach(function(p){ localById[p.id]=p; });
-    var own={}, ghost={};
+    var own={}, ghost={}, purge={};
     (base.projects||[]).forEach(function(p){
-      if(!p||server[p.id]||!localById[p.id]) return;
+      if(!p) return;
+      // Admin-purged projects are evicted unconditionally: never
+      // re-uploaded, never tombstoned - simply gone.
+      if(purgedSet[p.id]){ purge[p.id]=1; return; }
+      if(server[p.id]||!localById[p.id]) return;
       if(!p.owner_id||p.owner_id===sbUser.id) own[p.id]=1; else ghost[p.id]=1;
     });
-    if(!Object.keys(own).length&&!Object.keys(ghost).length) return base;
+    Object.keys((base.settings)||{}).forEach(function(pid){ if(purgedSet[pid]) purge[pid]=1; });
+    if(!Object.keys(own).length&&!Object.keys(ghost).length&&!Object.keys(purge).length) return base;
+    var evict={}; Object.keys(own).forEach(function(k){evict[k]=1;}); Object.keys(purge).forEach(function(k){evict[k]=1;});
     var snap=JSON.parse(JSON.stringify(base));
     var sw={};
-    (snap.poeSwitches||[]).concat(snap.portSwitches||[]).forEach(function(s){ if(own[s.projectId]) sw[s.id]=1; });
-    snap.projects=(snap.projects||[]).filter(function(p){ return !own[p.id]; });
+    (snap.poeSwitches||[]).concat(snap.portSwitches||[]).forEach(function(s){ if(evict[s.projectId]) sw[s.id]=1; });
+    snap.projects=(snap.projects||[]).filter(function(p){ return !evict[p.id]; });
     ['timeEntries','pulls','materials','ipAssignments','poeSwitches','portSwitches'].forEach(function(k){
-      snap[k]=(snap[k]||[]).filter(function(x){ return !own[x.projectId]; });
+      snap[k]=(snap[k]||[]).filter(function(x){ return !evict[x.projectId]; });
     });
     ['poeDevices','portEntries'].forEach(function(k){
       snap[k]=(snap[k]||[]).filter(function(x){ return !sw[x.switchId]; });
     });
-    Object.keys(own).forEach(function(pid){
+    Object.keys(evict).forEach(function(pid){
       if(snap.techNames) delete snap.techNames[pid];
       if(snap.settings) delete snap.settings[pid];
     });
@@ -1918,7 +1944,25 @@ function reconcileSnapshot(base){
 function pushChanges(){
   if(!sb||!sbUser) return Promise.resolve();
   var base=lastSynced||emptySnapshot();
-  return reconcileSnapshot(base).then(function(snap){ return pushChangesDiff(snap); });
+  return fetchPurged().then(function(){ return reconcileSnapshot(base); })
+    .then(function(snap){ return pushChangesDiff(snap); });
+}
+function fetchPurged(){
+  // Projects an admin deleted permanently (purged_projects): drop any
+  // local copy instead of re-uploading it, and remember the ids so
+  // reconcileSnapshot evicts their snapshot rows too. Fails open - if
+  // the table is not there yet, sync proceeds exactly as before.
+  purgedSet={};
+  if(!sb||!sbUser) return Promise.resolve();
+  return sb.from('purged_projects').select('project_id').then(function(r){
+    if(r.error||!r.data) return;
+    r.data.forEach(function(x){ purgedSet[x.project_id]=1; });
+    var hit=false;
+    Object.keys(purgedSet).forEach(function(pid){
+      if(projById(pid)){ pruneLocalProject(pid); hit=true; }
+    });
+    if(hit) syncNote='A project deleted permanently by an admin was removed from this device';
+  },function(){});
 }
 function pushChangesDiff(snap){
   var leftIds=leftProjectIds(snap);
@@ -2123,6 +2167,7 @@ function setSyncStatus(s){
 }
 var syncErrMsg='';
 var syncNote='';
+var purgedSet={};
 function syncStatusText(){
   if(syncStatus==='syncing') return 'Syncing…';
   if(syncStatus==='offline') return syncErrMsg?('Sync error: '+syncErrMsg.slice(0,90)):'Offline — changes saved on this device';
@@ -2293,11 +2338,6 @@ function renderAdmin(){
     return pr?profLabel(pr):(sbUser&&id===sbUser.id?sbUser.email:String(id).slice(0,8)+'\u2026'); };
   var h='<div style="margin:4px 2px 12px"><div style="font-size:1.55rem;font-weight:800">Admin</div>'
     +'<div class="mut">Users, projects and repairs \u2014 visible only to admins.</div></div>';
-  h+='<div class="card"><h3>Create user</h3>'
-    +'<label>Email</label><input id="ad_email" type="email" placeholder="tech@example.com">'
-    +'<label>Temporary password</label><input id="ad_pass" type="text" placeholder="8+ characters \u2014 share it with them">'
-    +'<button class="btn" onclick="adminCreateUser()">Create user</button>'
-    +'<p class="mut">Runs through the admin Edge Function. The new user can sign in right away.</p></div>';
   h+='<div class="card"><h3>Users ('+d.profiles.length+')</h3>';
   d.profiles.forEach(function(pr){
     var adm=d.admins.indexOf(pr.id)>=0;
@@ -2308,11 +2348,13 @@ function renderAdmin(){
       +'<div class="mut" style="font-size:.76rem">'+(nm?esc(pr.email)+' \u00b7 ':'')+'owns '+owned+' \u00b7 member of '+memb+'</div></span>'
       +'<span style="display:flex;gap:6px;align-items:center;flex:0 0 auto">'
       +(adm?tbadge('admin','#1d5c96'):'')
-      +'<button class="btn sec sml" onclick="adminEditName(\''+pr.id+'\')">'+(nm?'Edit name':'Set name')+'</button>'
+      +'<span class="cardmenu"><button class="iconbtn" aria-label="User actions" onclick="event.stopPropagation();toggleAdminMenu(\'u-'+pr.id+'\')">&#8942;</button>'
+      +'<span class="cmenu" id="amenu-u-'+pr.id+'" style="display:none">'
+      +'<button onclick="adminEditName(\''+pr.id+'\')">'+(nm?'Edit name':'Set name')+'</button>'
       +(adm
-        ?'<button class="btn sec sml" onclick="adminSetAdmin(\''+pr.id+'\',false)">Remove admin</button>'
-        :'<button class="btn sec sml" onclick="adminSetAdmin(\''+pr.id+'\',true)">Make admin</button>')
-      +'</span></div>';
+        ?'<button onclick="adminSetAdmin(\''+pr.id+'\',false)">Remove admin</button>'
+        :'<button onclick="adminSetAdmin(\''+pr.id+'\',true)">Make admin</button>')
+      +'</span></span></span></div>';
     if(adminNameEdit===pr.id){
       h+='<div style="display:flex;gap:6px;align-items:center;padding:2px 0 10px">'
         +'<input id="ad_name_'+pr.id+'" value="'+esc(nm)+'" placeholder="Display name (blank clears it)" style="flex:1;margin:0">'
@@ -2327,20 +2369,77 @@ function renderAdmin(){
     h+='<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(pr.name)+'</b>'
       +(pr.deleted_at?'<span class="tbadge" style="background:#a33333">deleted</span>':'')
       +'<span class="mut">owner '+esc(labelOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</span>'
-      +(pr.deleted_at?'<button class="btn sec sml" style="margin-left:auto" onclick="adminUntombstone(\''+pr.id+'\')">Restore</button>':'')
+      +'<span class="cardmenu" style="margin-left:auto"><button class="iconbtn" aria-label="Project actions" onclick="event.stopPropagation();toggleAdminMenu(\'p-'+pr.id+'\')">&#8942;</button>'
+      +'<span class="cmenu" id="amenu-p-'+pr.id+'" style="display:none">'
+      +(pr.deleted_at?'<button onclick="adminUntombstone(\''+pr.id+'\')">Restore</button>':'')
+      +'<button class="danger" onclick="adminPurgeConfirm(\''+pr.id+'\')">Delete permanently</button>'
+      +'</span></span>'
       +'</div>'
       +mem.map(function(m){
         return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0 0 14px"><span class="mut" style="flex:1">'+esc(labelOf(m.user_id))+'</span>'
-          +'<button class="btn sec sml" onclick="adminRemoveMember(\''+pr.id+'\',\''+m.user_id+'\')">Remove</button></div>';}).join('')
+          +'<span class="cardmenu"><button class="iconbtn" aria-label="Member actions" onclick="event.stopPropagation();toggleAdminMenu(\'m-'+pr.id+'-'+m.user_id+'\')">&#8942;</button>'
+          +'<span class="cmenu" id="amenu-m-'+pr.id+'-'+m.user_id+'" style="display:none">'
+          +'<button class="danger" onclick="adminRemoveMember(\''+pr.id+'\',\''+m.user_id+'\')">Remove from project</button>'
+          +'</span></span></div>';}).join('')
       +'</div>';
   });
   h+='</div>';
+  h+='<button class="fab" onclick="openCreateUser()" aria-label="Create user">+</button>';
   $('app').innerHTML=h;
 }
+function toggleAdminMenu(key){
+  var m=$('amenu-'+key);if(!m)return;var was=m.style.display!=='none';
+  Array.prototype.forEach.call(document.querySelectorAll('.cardmenu .cmenu'),function(x){x.style.display='none';});
+  if(!was)m.style.display='block';}
+function openCreateUser(){
+  closeCreateUser();
+  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='cuDlg';
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Create user</h3></div>'
+    +'<label>Email</label><input id="ad_email" type="email" placeholder="tech@example.com">'
+    +'<label>Temporary password</label><input id="ad_pass" type="text" placeholder="8+ characters \u2014 share it with them">'
+    +'<p class="mut">Runs through the admin Edge Function. The new user can sign in right away.</p>'
+    +'<div style="display:flex;gap:8px"><button class="btn sec" style="flex:1" onclick="closeCreateUser()">Cancel</button>'
+    +'<button class="btn" style="flex:1" onclick="if(adminCreateUser())closeCreateUser()">Create user</button></div></div>';
+  ov.addEventListener('click',function(e){ if(e.target===ov) closeCreateUser(); });
+  document.body.appendChild(ov);
+}
+function closeCreateUser(){ var o=document.getElementById('cuDlg'); if(o) o.remove(); }
+function adminPurgeConfirm(pid){
+  var pr=((adminData&&adminData.projects)||[]).filter(function(x){return x.id===pid;})[0]; if(!pr)return;
+  var mem=((adminData&&adminData.members)||[]).filter(function(x){return x.project_id===pid;});
+  var ownerPr=((adminData&&adminData.profiles)||[]).filter(function(x){return x.id===pr.owner_id;})[0];
+  var ownerLbl=ownerPr?profLabel(ownerPr):String(pr.owner_id||'').slice(0,8)+'\u2026';
+  closePurge();
+  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='purgeDlg';
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Delete permanently?</h3></div>'
+    +'<p style="margin:2px 0"><b>'+esc(pr.name)+'</b></p>'
+    +'<p class="mut" style="margin:2px 0">Owner '+esc(ownerLbl)+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</p>'
+    +'<div id="purgeCounts"><p class="mut">Counting records\u2026</p></div>'
+    +'<p class="mut">This removes the project and all its data from the server, for everyone. It disappears from every device on its next sync. There is no undo \u2014 Export is the only way back.</p>'
+    +'<div style="display:flex;gap:8px"><button class="btn sec" style="flex:1" onclick="closePurge()">Cancel</button>'
+    +'<button class="btn danger" id="purgeGo" style="flex:1" disabled onclick="adminPurgeGo(\''+pid+'\')">Delete permanently</button></div></div>';
+  ov.addEventListener('click',function(e){ if(e.target===ov) closePurge(); });
+  document.body.appendChild(ov);
+  sb.functions.invoke('admin',{body:{action:'projectStats',projectId:pid}}).then(function(r){
+    var box=$('purgeCounts'); if(!box)return;
+    if(r.error||!r.data||r.data.error||!r.data.counts){ box.innerHTML='<div class="err">Could not count its records \u2014 delete is unavailable.</div>'; return; }
+    var c=r.data.counts, L={time_entries:'Time entries',cable_pulls:'Cable pulls',materials:'Materials',ip_assignments:'IP assignments',poe_switches:'PoE switches',poe_devices:'PoE devices',port_switches:'Port switches',port_entries:'Port entries',technicians:'Technicians',members:'Members'}, rows=[];
+    Object.keys(L).forEach(function(k){ if(c[k]) rows.push(L[k]+': '+c[k]); });
+    box.innerHTML='<p class="mut">'+(rows.length?rows.join(' \u00b7 '):'No records \u2014 just the project itself.')+'</p>';
+    var b=$('purgeGo'); if(b) b.disabled=false;
+  },function(){ var box=$('purgeCounts'); if(box) box.innerHTML='<div class="err">Could not count its records \u2014 delete is unavailable.</div>'; });
+}
+function adminPurgeGo(pid){
+  closePurge();
+  adminFn('purgeProject',{projectId:pid},'Project deleted permanently');
+  if(projById(pid)){ pruneLocalProject(pid); save(); }
+}
+function closePurge(){ var o=document.getElementById('purgeDlg'); if(o) o.remove(); }
 function adminCreateUser(){
   var em=val('ad_email'), pw=val('ad_pass');
-  if(!em||pw.length<8){ toast('Email + password (8+ chars) required'); return; }
+  if(!em||pw.length<8){ toast('Email + password (8+ chars) required'); return false; }
   adminFn('createUser',{email:em,password:pw},'User created: '+em);
+  return true;
 }
 function adminSetAdmin(uid,make){
   if(!make&&!confirm('Remove admin from this user?'))return;
