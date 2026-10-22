@@ -250,7 +250,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.4.1';
+var APP_VERSION='4.4.2';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1521,6 +1521,7 @@ function renderActivity(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.4.2',items:['Sync fix: settings for a deleted project could block every sync with a server security error - they are now skipped, a refused settings row no longer stops the rest of the sync, and the 3 projects waiting on the server can come down']},
  {v:'4.4.1',items:['Desktop: content now stretches the full width of the window on every page - no more empty gap on the right of wide screens']},
  {v:'4.4',items:['Admins can set a display name for each user (Admin \u2192 Users \u2192 Set name). Names then show instead of emails in the share picker, project Technicians and Admin','One-time setup: run migration-4.4-display-names.sql in Supabase and re-deploy the admin Edge Function']},
  {v:'4.3.2',items:['Desktop: Hours this week and Recent activity are now stacked full-width on the Dashboard instead of side by side']},
@@ -2030,19 +2031,32 @@ function pushTechnicians(snap){
 }
 function pushSettings(snap){
   var leftIds=leftProjectIds(snap);
+  var live={}; (data.projects||[]).forEach(function(p){ live[p.id]=1; });
   var pids={};
   Object.keys(data.storageCalcs||{}).forEach(function(k){pids[k]=1;});
   Object.keys(data.ipSubnets||{}).forEach(function(k){pids[k]=1;});
   Object.keys((snap&&snap.settings)||{}).forEach(function(k){pids[k]=1;});
   var jobs=[];
   Object.keys(pids).forEach(function(pid){
-    if(leftIds[pid]) return;
+    // Settings only ever go up for projects that exist on this device.
+    // A deleted or left project leaves settings behind in the snapshot;
+    // pushing them hits a tombstoned/non-member project server-side,
+    // the write is refused, and the failure used to wedge the whole sync.
+    if(leftIds[pid]||!live[pid]) return;
     var cur={storage:(data.storageCalcs||{})[pid],subnets:(data.ipSubnets||{})[pid]};
     var old=(snap.settings||{})[pid];
     if(JSON.stringify(canon(cur))!==JSON.stringify(canon(old||{}))){
       jobs.push(sb.from('project_settings').upsert(
         {project_id:pid,storage_calc:cur.storage||null,ip_subnets:cur.subnets||null},
-        {onConflict:'project_id'}).then(function(r){ if(r.error) throw r.error; }));
+        {onConflict:'project_id'}).then(function(r){
+          if(!r.error) return;
+          // Refused (RLS): the project is gone or access was revoked
+          // server-side. Skip this row and let the sync finish - the
+          // pull phase reconciles the local copy. Anything else is a
+          // real error and still aborts the sync.
+          if(r.error.code==='42501'){ syncNote='One project\u2019s storage/subnet settings were refused by the server and skipped'; return; }
+          throw r.error;
+        }));
     }
   });
   return Promise.all(jobs);
@@ -2108,10 +2122,11 @@ function setSyncStatus(s){
   if(el) el.textContent=syncStatusText();
 }
 var syncErrMsg='';
+var syncNote='';
 function syncStatusText(){
   if(syncStatus==='syncing') return 'Syncing…';
   if(syncStatus==='offline') return syncErrMsg?('Sync error: '+syncErrMsg.slice(0,90)):'Offline — changes saved on this device';
-  if(syncStatusAt) return 'Synced '+new Date(syncStatusAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  if(syncStatusAt) return 'Synced '+new Date(syncStatusAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+(syncNote?'. Note: '+syncNote:'');
   return 'Not synced yet';
 }
 function queueSync(){
@@ -2121,7 +2136,7 @@ function queueSync(){
 }
 function syncNow(manual){
   if(!sb||!sbUser||syncing) return Promise.resolve(false);
-  syncing=true; setSyncStatus('syncing');
+  syncing=true; syncNote=''; setSyncStatus('syncing');
   var pullStart=new Date().toISOString();
   return pushChanges().then(function(){ return pullChanges(); }).then(function(changed){
     merging=true;
