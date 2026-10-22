@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v4.0
+**Current version:** v4.1
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v4.1** — Desktop layout now matches the design: left sidebar with your projects and sync status, project search, stat cards (today, this week, cable this week, active projects) and chart + activity side by side on wide screens.
 
 - **v4.0** — Visual Dashboard redesign complete (home header, color-banded tiles, project interior, new Timer and PoE screens, desktop sidebar layout) plus a new Admin area: in-app user creation, admin assign/remove, project oversight and repairs (one-time setup: migration-4.0-admin.sql + admin Edge Function).
 
