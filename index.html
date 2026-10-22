@@ -252,7 +252,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.5';
+var APP_VERSION='4.5.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -571,7 +571,7 @@ function dashboardHTML(){
   var chartHTML=function(maxH){
     var cH='<div class="card"><div class="cardhd"><h3>Hours this week</h3></div><div style="display:flex;align-items:flex-end;gap:6px;padding-top:2px">';
     for(var j=0;j<7;j++){ var bh=wmax?Math.max(5,Math.round(wmin[j]/wmax*maxH)):5; var isT=j===dow;
-      cH+='<div style="flex:1;text-align:center"><div class="mut" style="font-size:.7rem;height:14px">'+(wmin[j]?(Math.round(wmin[j]/6)/10):'')+'</div>'
+      cH+='<div style="flex:1;text-align:center"><div class="mut" style="font-size:.7rem;height:14px">'+(wmin[j]?((wmin[j]/60).toFixed(2).replace(/\.?0+$/,'')):'')+'</div>'
         +'<div style="height:'+(maxH+6)+'px;display:flex;align-items:flex-end;justify-content:center"><div style="width:26px;height:'+bh+'px;border-radius:7px;background:'+(isT?'var(--accent)':'#3a405e')+'"></div></div>'
         +'<div class="mut" style="font-size:.72rem;margin-top:5px;'+(isT?'color:var(--text);font-weight:700':'')+'">'+days[j]+'</div></div>'; }
     return cH+'</div></div>';
@@ -1540,6 +1540,7 @@ function renderActivity(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.5.1',items:['Dashboard week chart labels now show the exact hours (7.25, 7.5, 7.75) instead of rounding to one decimal (7.3)']},
  {v:'4.5',items:['Admin: projects can be deleted permanently from the server (menu on each project - with a record count before you confirm); purged projects remove themselves from every device on its next sync','Admin: all user and project actions now live under the three-dot menu on each row, and Create user moved to the floating + button','One-time setup: run migration-4.5-purge.sql in Supabase and re-deploy the admin Edge Function']},
  {v:'4.4.2',items:['Sync fix: settings for a deleted project could block every sync with a server security error - they are now skipped, a refused settings row no longer stops the rest of the sync, and the 3 projects waiting on the server can come down']},
  {v:'4.4.1',items:['Desktop: content now stretches the full width of the window on every page - no more empty gap on the right of wide screens']},
