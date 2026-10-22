@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v4.3
+**Current version:** v4.3.1
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v4.3.1** — Desktop: removed the empty space at the top (content starts at the top, three-dot menu floats in the corner); Hours this week card no longer stretches with a gap underneath; long notes in Recent activity trimmed to two lines on the Dashboard
 
 - **v4.3** — New Dashboard screen is now the app's landing page (greeting, stats, hours chart, recent activity); Projects is its own screen with search + New Project; Done is now called Closed; desktop top bar removed (sidebar carries the branding), three-dot menu stays top-right
 

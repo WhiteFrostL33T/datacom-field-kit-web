@@ -110,6 +110,7 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
   align-items:center;justify-content:center;color:var(--accent);}
 .mod-ic svg{width:20px;height:20px;}
 .feeditem{display:flex;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line);align-items:flex-start;}
+.dashfeed .fib .mut{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .feeditem:last-child{border-bottom:none;}
 .fic{width:40px;height:40px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--chip);}
 .fic svg{width:20px;height:20px;stroke:var(--accent);}
@@ -160,9 +161,10 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
   padding:11px 13px;font-size:.86rem;font-weight:600;}
 @media (min-width:1024px){
   main{max-width:1180px;margin-left:240px;margin-right:auto;padding:22px 26px 60px;}
-  header{background:transparent;box-shadow:none;padding:10px 16px;pointer-events:none;}
-  header .ttl{display:none;}
+  header{position:fixed;top:0;right:0;left:auto;background:transparent;box-shadow:none;padding:10px 16px;pointer-events:none;}
+  header .ttl{display:none !important;}
   header .hdrmenu{pointer-events:auto;margin-left:auto;}
+  #timerbar.show{margin-left:240px;}
   #deskSide{display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;width:240px;
     background:#10121c;border-right:1px solid var(--line);padding:20px 14px;z-index:35;overflow-y:auto;}
   #tabbar{display:none;}
@@ -180,7 +182,7 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
   .deskflex{display:flex;}
   .deskStats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px;}
   .deskStats .card{margin:0;}
-  .deskHome2{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;}
+  .deskHome2{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;align-items:start;}
   .deskHome2 .card{margin:0;}
 }
 </style>
@@ -248,7 +250,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.3';
+var APP_VERSION='4.3.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -578,7 +580,7 @@ function dashboardHTML(){
   data.pulls.forEach(function(p){ var t=p.createdAt||(p.date?new Date(p.date+'T12:00:00').getTime():0); ev.push({t:isFinite(t)?t:0,type:'pull',e:p}); });
   data.materials.forEach(function(m){ ev.push({t:m.createdAt||0,type:'mat',e:m}); });
   ev.sort(function(a,b){return b.t-a.t;}); ev=ev.slice(0,5);
-  var actH='<div class="card"><div class="cardhd"><h3>Recent activity</h3></div>';
+  var actH='<div class="card dashfeed"><div class="cardhd"><h3>Recent activity</h3></div>';
   if(!ev.length) actH+='<p class="mut">Nothing yet — log time, cable or materials and it will show up here.</p>';
   ev.forEach(function(it){ actH+=feedItem(it); });
   actH+='</div>';
@@ -603,7 +605,7 @@ function renderProjects(){
     +'<input id="ip_file" type="file" accept=".json,.txt,application/json,text/plain">'
     +'<button class="btn sec" onclick="importProjectFile()">Import project</button>'
     +'<div id="ip_msg"></div></div></div>';
-  h+='<div class="deskflex" style="align-items:center;gap:12px;margin:2px 0 14px;justify-content:flex-end">'
+  h+='<div class="deskflex" style="align-items:center;gap:12px;margin:2px 0 14px;justify-content:flex-end;padding-right:64px">'
     +'<input id="deskSearch" placeholder="Search projects..." value="'+esc(deskQuery)+'" oninput="deskFilter(this.value)" style="width:300px;flex:0 0 300px;margin:0">'
     +'<button class="btn" style="background:var(--teal);flex:0 0 auto;width:auto" onclick="fabNewProject()">+ New Project</button></div>';
   var shown=[];
@@ -1511,6 +1513,7 @@ function renderActivity(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.3.1',items:['Desktop: removed the empty space at the top \u2014 content now starts at the top of the window with just the \u22ef button floating in the corner','Desktop: the Hours this week card no longer stretches with a gap underneath, and long notes in Recent activity are trimmed to two lines (the full text is still on the Activity tab)']},
  {v:'4.3',items:['New Dashboard screen: the greeting, today/week stats, hours chart and recent activity now live on their own Dashboard tab \u2014 and the app opens on it','Projects is now just your projects, with the search and New Project button at the top','Done projects are now called Closed','Desktop: the top bar is gone (the sidebar carries the name and logo now); the \u22ef menu stays in the top-right corner']},
  {v:'4.2',items:['The Dashboard tab is now called Activity \u2014 it is the activity log \u2014 and it sits below Projects and Timer in the sidebar','Desktop: the Hours this week chart is taller now, so its card no longer has dead space']},
  {v:'4.1.1',items:['Fix: materials without a unit no longer print "(undefined)" in Connectwise Notes (single-entry copy and full export)']},
