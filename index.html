@@ -252,7 +252,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.7.1';
+var APP_VERSION='4.8';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -293,6 +293,14 @@ function myProjectMinutes(pid){ return data.timeEntries.filter(function(e){retur
   .reduce(function(s,e){return s+entryMinutes(e);},0); }
 var CABLE_TYPES=['CAT6 Riser','CAT6 Plenum','Controlled Access Cable','2 Conductor Cable','4 Conductor Cable','6 Conductor Cable'];
 var CABLE_COLORS=['Blue','Black','White','Gray','Red','Green','Yellow','Orange','Purple','Brown'];
+function dayLabel(key){ var y=+key.slice(0,4),m=+key.slice(5,7)-1,d=+key.slice(8,10);
+  var dt=new Date(y,m,d);
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+', '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m]+' '+d; }
+function lastActivityTs(p){ var t=0;
+  data.timeEntries.forEach(function(e){ if(e.projectId===p.id){ var x=new Date(e.startISO).getTime(); if(isFinite(x)&&x>t)t=x; } });
+  data.pulls.forEach(function(x){ if(x.projectId===p.id){ var v=x.createdAt||(x.date?new Date(x.date+'T12:00:00').getTime():0); if(isFinite(v)&&v>t)t=v; } });
+  data.materials.forEach(function(m){ if(m.projectId===p.id&&m.createdAt&&m.createdAt>t)t=m.createdAt; });
+  return t; }
 function projectCableFt(pid){return data.pulls.filter(function(x){return x.projectId===pid;})
   .reduce(function(s,x){return s+(Number(x.used)||0);},0);}
 function toLocalInput(d){var p=function(n){return String(n).padStart(2,'0');};
@@ -339,7 +347,8 @@ var TABDEF=[
  {id:'dashboard',label:'Dashboard',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>'},
  {id:'projects',label:'Projects',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>'},
  {id:'timer',label:'Timer',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>'},
- {id:'activity',label:'Activity',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>'}];
+ {id:'activity',label:'Activity',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>'},
+ {id:'timesheet',label:'Timesheet',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 9h18M8 13h8M8 17h5"/></svg>'}];
 var TRASH_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
 var PLUS_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>';
 var GEAR_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
@@ -356,7 +365,7 @@ var MODICONS={
 function renderDeskSide(){
   var el=$('deskSide'); if(!el) return;
   if(sbReady&&!sbUser){ el.innerHTML=''; return; }
-  var nav=[['dashboard','Dashboard','goDashboard()'],['projects','Projects','goProjects()'],['timer','Timer','goTimer()'],['activity','Activity','goActivity()']];
+  var nav=[['dashboard','Dashboard','goDashboard()'],['projects','Projects','goProjects()'],['timer','Timer','goTimer()'],['activity','Activity','goActivity()'],['timesheet','Timesheet','goTimesheet()']];
   var h='<div style="display:flex;align-items:center;gap:10px;padding:2px 6px 18px"><img src="logo.png" alt="" style="width:40px;height:40px;border-radius:10px;flex:0 0 auto"><div><div style="font-weight:800;font-size:1.05rem;line-height:1.1">Field Kit</div><div class="mut" style="font-size:.8rem">Datacom</div></div></div>';
   nav.forEach(function(n){
     h+='<button class="dsnav'+(view.name===n[0]?' act':'')+'" onclick="'+n[2]+'">'+n[1]+'</button>';
@@ -406,6 +415,7 @@ function render(skipTrack){
     view.name==='timer'?'Timer':
     view.name==='dashboard'?'Dashboard':
     view.name==='activity'?'Activity':
+    view.name==='timesheet'?'Timesheet':
     view.name==='backup'?'Backup / Restore':
     view.name==='about'?'About':
     view.name==='admin'?'Admin':
@@ -415,6 +425,7 @@ function render(skipTrack){
   else if(view.name==='projects')renderProjects();
   else if(view.name==='timer')renderTimer();
   else if(view.name==='activity')renderActivity();
+  else if(view.name==='timesheet')renderTimesheet();
   else if(view.name==='backup')renderBackup();
   else if(view.name==='about')renderAbout();
   else if(view.name==='admin')renderAdmin();
@@ -636,11 +647,10 @@ function renderProjects(){
   }
   if(data.projects.length)
     h+='<div class="deskonly" style="font-size:1.25rem;font-weight:800;margin:16px 2px 10px">'+(projTab==='done'?'Closed projects':'Active projects')+'</div>';
-  h+='<div class="projgrid">';
-  shown.forEach(function(p){
+  var cardHTML=function(p){
     var done=(p.status||'active')==='done';
     var pc=projColor(p);
-    h+='<div class="card projcard" data-search="'+esc((p.name+' '+(p.customer||'')+' '+(p.site||'')+' '+(p.ticket||'')).toLowerCase())+'" onclick="openProject(\''+p.id+'\')">'
+    return '<div class="card projcard" data-search="'+esc((p.name+' '+(p.customer||'')+' '+(p.site||'')+' '+(p.ticket||'')).toLowerCase())+'" onclick="openProject(\''+p.id+'\')">'
       +'<div style="height:10px;border-radius:18px 18px 0 0;background:'+pc+';margin:-14px -14px 12px"></div>'
       +'<div class="proj-head"><div class="grow"><h3 style="font-size:1.12rem">'+esc(p.name)+cwTag(p)+'</h3>'
       +'<div class="mut">'+esc(p.customer||'')+(p.customer&&p.site?' · ':'')+esc(p.site||'')+'</div></div>'
@@ -649,8 +659,13 @@ function renderProjects(){
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">'
       +tbadge(done?'closed':'active',done?'#a33333':'#1e7a46')
       +'<b style="font-size:1.35rem;color:'+pc+'">'+fmtHM(myProjectMinutes(p.id))+'</b></div></div>';
-  });
-  h+='</div>';
+  };
+  var weekCut=Date.now()-7*864e5;
+  var week=shown.filter(function(p){return lastActivityTs(p)>=weekCut;})
+    .sort(function(a,b){return lastActivityTs(b)-lastActivityTs(a);});
+  var rest=shown.filter(function(p){return lastActivityTs(p)<weekCut;});
+  if(week.length){ h+='<div class="seclbl">This week</div><div class="projgrid">'; week.forEach(function(p){h+=cardHTML(p);}); h+='</div>'; }
+  if(rest.length){ h+='<div class="seclbl">All projects</div><div class="projgrid">'; rest.forEach(function(p){h+=cardHTML(p);}); h+='</div>'; }
   h+='<button class="fab" aria-label="New project" onclick="fabNewProject()">+</button>';
   $('app').innerHTML=h;
   if(deskQuery)deskFilter(deskQuery);
@@ -1567,17 +1582,128 @@ function renderActivity(){
   ev=ev.slice(0,40);
   var h='<div class="card"><h3>Activity log</h3>';
   if(!ev.length)h+='<p class="mut">Nothing yet \u2014 log time, cable or materials and it will show up here.</p>';
-  var lastDay='',now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  var days={},order=[];
   ev.forEach(function(it){
-    var d=new Date(it.t),day=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
-    var lbl=day===today?'Today':day===today-864e5?'Yesterday':'Earlier';
-    if(lbl!==lastDay){h+='<div class="seclbl">'+lbl+'</div>';lastDay=lbl;}
-    h+=feedItem(it);});
+    var k=dayOfTs(it.t)||'Undated';
+    if(!days[k]){days[k]=[];order.push(k);}
+    days[k].push(it);});
+  order.forEach(function(k){
+    var items=days[k],mins=0,ft=0,mat=0;
+    items.forEach(function(it){
+      if(it.type==='time')mins+=entryMinutes(it.e);
+      else if(it.type==='pull')ft+=(Number(it.e.used)||0);
+      else mat+=(Number(it.e.qty)||0);});
+    var parts=[];
+    if(mins)parts.push(fmtHM(mins));
+    if(ft)parts.push(ft+' ft');
+    if(mat)parts.push(mat+' materials');
+    var lbl=(k==='Undated')?'Undated':dayLabel(k)+(k===todayStr()?' \u00b7 Today':'');
+    h+='<div class="seclbl">'+lbl+(parts.length?' \u00b7 '+parts.join(' \u00b7 '):'')+'</div>';
+    items.forEach(function(it){h+=feedItem(it);});});
   h+='</div>';
   $('app').innerHTML=h;
 }
+/* ============ daily timesheet ============ */
+var tsDate=todayStr(), tsEditId=null;
+function goTimesheet(){view={name:'timesheet'};tsDate=todayStr();tsEditId=null;render();}
+function tsShift(d){ var y=+tsDate.slice(0,4),m=+tsDate.slice(5,7)-1,dd=+tsDate.slice(8,10);
+  var dt=new Date(y,m,dd+d);
+  tsDate=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+  tsEditId=null; render(); }
+function tsPick(v){ if(!v)return; tsDate=v; tsEditId=null; render(); }
+function tsEdit(id){ tsEditId=id; render(); }
+function tsCancel(){ tsEditId=null; render(); }
+function tsSave(id){
+  var e=data.timeEntries.filter(function(x){return x.id===id;})[0]; if(!e)return;
+  var p=projById(e.projectId);
+  if(!canEditEntry(p,e)){toast('You can only edit your own entries');return;}
+  var s=val('ts_start'),en=val('ts_end');
+  if(!s||!en||en<=s){toast('End must be after start');return;}
+  var lunch=Math.max(0,parseInt(val('ts_lunch'),10)||0);
+  var gross=(new Date(tsDate+'T'+en).getTime()-new Date(tsDate+'T'+s).getTime())/60000;
+  if(lunch>=gross){toast('Lunch must be shorter than the entry');return;}
+  e.startISO=tsDate+'T'+s; e.endISO=tsDate+'T'+en;
+  e.kind=val('ts_kind'); e.notes=val('ts_notes'); e.lunchMin=lunch;
+  tsEditId=null; save(); render();
+}
+function renderTimesheet(){
+  var fmtT=function(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
+  var toMin=function(iso){return +iso.slice(11,13)*60+ +iso.slice(14,16);};
+  var list=data.timeEntries.filter(function(e){return e.startISO&&e.startISO.slice(0,10)===tsDate&&isMine(e);})
+    .sort(function(a,b){return a.startISO<b.startISO?-1:a.startISO>b.startISO?1:0;});
+  var tot=list.reduce(function(s,e){return s+entryMinutes(e);},0);
+  var pset={}; list.forEach(function(e){pset[e.projectId]=1;});
+  var h='<div class="card"><div style="display:flex;align-items:center;justify-content:space-between">'
+    +'<button class="iconbtn" aria-label="Previous day" onclick="tsShift(-1)">&#8249;</button>'
+    +'<div style="text-align:center"><div style="font-size:1.25rem;font-weight:800">'+esc(dayLabel(tsDate))+(tsDate===todayStr()?' \u00b7 Today':'')+'</div><div class="mut">Daily timesheet</div></div>'
+    +'<button class="iconbtn" aria-label="Next day" onclick="tsShift(1)">&#8250;</button></div>'
+    +'<div style="margin-top:10px"><input type="date" value="'+tsDate+'" onchange="tsPick(this.value)" style="width:auto"></div>'
+    +'<div style="margin-top:8px"><b style="font-size:1.2rem">'+fmtHM(tot)+'</b> <span class="mut">\u00b7 '+list.length+' entries \u00b7 '+Object.keys(pset).length+' projects</span></div>';
+  if(!list.length){
+    h+='<p class="mut" style="margin-top:14px">No time logged this day. Add entries from a project\u2019s Time tab or the Timer.</p>';
+  } else {
+    // timeline bar: lanes for overlaps, dashed segments for gaps >= 15 min
+    var lo=360,hi=1080;
+    list.forEach(function(e){lo=Math.min(lo,toMin(e.startISO));hi=Math.max(hi,toMin(e.endISO));});
+    var span=hi-lo||1;
+    var lanes=[];
+    var blocks=list.map(function(e){
+      var s=toMin(e.startISO),en=toMin(e.endISO),lane=0;
+      while(lanes[lane]!==undefined&&lanes[lane]>s)lane++;
+      lanes[lane]=en;
+      var p=projById(e.projectId);
+      return {s:s,en:en,lane:lane,color:projColor(p),kind:e.kind};
+    });
+    var barH=lanes.length*30+8;
+    h+='<div style="position:relative;height:'+barH+'px;border:1px solid var(--line);border-radius:12px;margin-top:14px;overflow:hidden;background:var(--bg)">';
+    blocks.forEach(function(b){
+      h+='<div style="position:absolute;top:'+(4+b.lane*30)+'px;height:22px;left:'+((b.s-lo)/span*100).toFixed(1)+'%;width:'+((b.en-b.s)/span*100).toFixed(1)+'%;background:'+b.color+';border-radius:7px;padding:2px 6px;font-size:.75rem;font-weight:700;overflow:hidden;white-space:nowrap;color:#10121c">'+esc(b.kind)+'</div>';
+    });
+    var gEnd=0;
+    list.forEach(function(e){
+      var s=toMin(e.startISO);
+      if(gEnd&&s>gEnd&&(s-gEnd)>=15){
+        var g=s-gEnd;
+        h+='<div style="position:absolute;top:4px;height:22px;left:'+((gEnd-lo)/span*100).toFixed(1)+'%;width:'+(g/span*100).toFixed(1)+'%;border:1.5px dashed #f59e0b;border-radius:7px;color:#fbbf24;font-size:.75rem;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap">'+(g>=30?'gap '+g+' m':'')+'</div>';
+      }
+      if(toMin(e.endISO)>gEnd)gEnd=toMin(e.endISO);
+    });
+    h+='</div><div style="display:flex;justify-content:space-between;color:var(--muted);font-size:.75rem;margin-top:4px"><span>'+fmtT(lo)+'</span><span>'+fmtT(hi)+'</span></div>';
+    // rows in time order, with gap / overlap flags
+    var maxEnd=0,maxEntry=null;
+    list.forEach(function(e){
+      var s=toMin(e.startISO),en=toMin(e.endISO);
+      if(maxEnd&&s>maxEnd&&(s-maxEnd)>=15){
+        h+='<div style="border:1.5px solid #f59e0b;background:rgba(245,158,11,.10);border-radius:12px;padding:10px 12px;margin-top:10px;color:#fbbf24;font-weight:700">\u26a0 Gap '+fmtT(maxEnd)+' \u2013 '+fmtT(s)+' \u00b7 '+(s-maxEnd)+' min unaccounted</div>';
+      }
+      var over=(maxEnd&&s<maxEnd)?maxEntry:null;
+      var p=projById(e.projectId);
+      h+='<div style="border:1px solid '+(over?'#f59e0b':'var(--line)')+';border-radius:14px;padding:10px 12px;margin-top:10px;background:var(--bg)">'
+        +'<div><b>'+e.startISO.slice(11,16)+' \u2013 '+e.endISO.slice(11,16)+' \u00b7 '+esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+'</b>'
+        +(e.lunchMin?' <span class="mut">\u00b7 lunch '+e.lunchMin+' min</span>':'')+'</div>'
+        +'<div class="mut">'+esc(p?p.name:'?')+(e.notes?' \u00b7 '+esc(e.notes):'')+'</div>'
+        +(over?'<div style="color:#fbbf24;font-weight:700;font-size:.9rem">\u26a0 Overlaps '+esc(over.kind)+' '+over.startISO.slice(11,16)+' \u2013 '+over.endISO.slice(11,16)+'</div>':'')
+        +(canEditEntry(p,e)?'<button class="btn sec" style="margin-top:8px;width:auto" onclick="tsEdit(\''+e.id+'\')">Edit</button>':'')
+        +'</div>';
+      if(tsEditId===e.id){
+        h+='<div class="card" style="margin-top:10px"><h3>Edit entry</h3>'
+          +'<div class="row"><div><label>Start</label><input id="ts_start" type="time" value="'+e.startISO.slice(11,16)+'"></div>'
+          +'<div><label>End</label><input id="ts_end" type="time" value="'+e.endISO.slice(11,16)+'"></div></div>'
+          +'<label>Kind</label><select id="ts_kind">'+KINDS.map(function(k){return '<option'+(k===e.kind?' selected':'')+'>'+k+'</option>';}).join('')+'</select>'
+          +'<label>Notes</label><textarea id="ts_notes" rows="2">'+esc(e.notes||'')+'</textarea>'
+          +'<label>Lunch (minutes)</label><input id="ts_lunch" type="number" inputmode="numeric" min="0" value="'+(e.lunchMin||'')+'">'
+          +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="tsSave(\''+e.id+'\')">Save</button><button class="btn sec" onclick="tsCancel()">Cancel</button></div></div>';
+      }
+      if(en>maxEnd){maxEnd=en;maxEntry=e;}
+    });
+  }
+  h+='</div>';
+  $('app').innerHTML=h;
+}
+
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.8',items:['Activity log now groups entries by day, each day headed with its totals (time, cable feet, materials)','Projects: jobs you touched in the last 7 days sit in a This week band above the full list','New Daily timesheet: the whole day across all projects on one screen - edit entries in place, a timeline bar on top, amber flags for gaps and overlaps']},
  {v:'4.7.1',items:['About page: changelog caught up - entries for 4.6, 4.6.1 and 4.7 were missing and are in now']},
  {v:'4.7',items:['Dashboard and project cards now count only your own hours (inside a project, totals still show everyone combined)','Recent activity shows only your entries from today that have notes','Cable: type and Cable Color are now dropdowns; the ConnectWise notes total cable by type and color','Time entries: new Lunch (minutes) deduction under Deductions in Add/Edit - every total comes out net of it']},
  {v:'4.6.1',items:['Fix: time entries logged before v4.6 pick up their author names on the next sync (the regular sync only fetches changed entries, so their stamps never arrived)']},
@@ -2346,6 +2472,7 @@ document.addEventListener('input',function(){ formDirty=true; });
 function uiBusy(){
   if(document.querySelector('.dlg-ov')) return true;
   if(typeof teEditId!=='undefined'&&teEditId) return true;
+  if(typeof tsEditId!=='undefined'&&tsEditId) return true;
   if(formDirty) return true;
   var ae=document.activeElement;
   if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&ae.id!=='cw_notes') return true;

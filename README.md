@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v4.7.1
+**Current version:** v4.8
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v4.8** — UX polish round: Activity log now groups entries by day with per-day totals; Projects gets a This week band for jobs touched in the last 7 days; new Daily timesheet tab - the whole day across all projects on one screen, editable in place, with a timeline bar and amber flags for gaps and overlaps.
 
 - **v4.7.1** — About page changelog caught up: the in-app What's New list had stopped at v4.5.2 - entries for v4.6, v4.6.1 and v4.7 are in now, and the release process now checks it on every ship.
 
