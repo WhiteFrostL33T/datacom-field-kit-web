@@ -252,7 +252,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.6';
+var APP_VERSION='4.6.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -2246,6 +2246,24 @@ function pullChanges(){
       }
     });
   }));
+  // v4.6.1 one-time heal: entries pulled before v4.6 never carried their
+  // author stamp locally, and the incremental pull above never refetches
+  // unchanged rows - so pre-4.6 history would stay unattributed forever.
+  // Fetch every visible time entry once, merge the stamps in, remember it.
+  if(!syncMeta.attrBackfill){
+    var teCfg=cfgOf('timeEntries');
+    if(teCfg) jobs.push(sb.from('time_entries').select('*').then(function(r){
+      if(r.error) throw r.error;
+      (r.data||[]).forEach(function(row){ if(mergeRow(teCfg,row)) changed=true; });
+      syncMeta.attrBackfill=true; saveSyncMeta();
+      var miss={}; data.timeEntries.forEach(function(e){ if(e.userId&&!authorLabels[e.userId]) miss[e.userId]=1; });
+      var missIds=Object.keys(miss);
+      if(!missIds.length) return;
+      return profilesQ(missIds).then(function(r2){
+        (r2.data||[]).forEach(function(pr){ var l=profLabel(pr); if(l){ authorLabels[pr.id]=l; changed=true; } });
+      }).catch(function(){});
+    }));
+  }
   return Promise.all(jobs).then(function(){ return changed; });
 }
 
