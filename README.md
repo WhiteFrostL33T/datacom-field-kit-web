@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v4.7
+**Current version:** v4.7.1
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v4.7.1** — About page changelog caught up: the in-app What's New list had stopped at v4.5.2 - entries for v4.6, v4.6.1 and v4.7 are in now, and the release process now checks it on every ship.
 
 - **v4.7** — Per-user hours: Dashboard (On the clock, week chart, Recent activity = your noted entries today) and project cards now count only the signed-in user's time; inside a project totals stay combined. Cable: type + Cable Color are dropdowns, pulls group by color, ConnectWise notes total cable by type + color. Time entries gain a Lunch deduction (minutes) in Add/Edit — every total goes net.
 

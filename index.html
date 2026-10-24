@@ -252,7 +252,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.7';
+var APP_VERSION='4.7.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1578,6 +1578,10 @@ function renderActivity(){
 }
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'4.7.1',items:['About page: changelog caught up - entries for 4.6, 4.6.1 and 4.7 were missing and are in now']},
+ {v:'4.7',items:['Dashboard and project cards now count only your own hours (inside a project, totals still show everyone combined)','Recent activity shows only your entries from today that have notes','Cable: type and Cable Color are now dropdowns; the ConnectWise notes total cable by type and color','Time entries: new Lunch (minutes) deduction under Deductions in Add/Edit - every total comes out net of it']},
+ {v:'4.6.1',items:['Fix: time entries logged before v4.6 pick up their author names on the next sync (the regular sync only fetches changed entries, so their stamps never arrived)']},
+ {v:'4.6',items:['Time entries show who logged them, and the ConnectWise log groups each day by person with per-person totals','You can only edit your own entries - the project owner can edit any entry on their project','When a teammate saves, your screen no longer repaints over a form you are filling in - a tap-to-refresh note appears instead']},
  {v:'4.5.2',items:['Sync fix: projects shared with you after your last sync now actually arrive (the pull checks the full project list, not just recently-changed ones), with their existing time, pulls and materials; a project you are removed from now leaves your device on the next sync']},
  {v:'4.5.1',items:['Dashboard week chart labels now show the exact hours (7.25, 7.5, 7.75) instead of rounding to one decimal (7.3)']},
  {v:'4.5',items:['Admin: projects can be deleted permanently from the server (menu on each project - with a record count before you confirm); purged projects remove themselves from every device on its next sync','Admin: all user and project actions now live under the three-dot menu on each row, and Create user moved to the floating + button','One-time setup: run migration-4.5-purge.sql in Supabase and re-deploy the admin Edge Function']},
