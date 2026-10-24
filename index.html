@@ -252,7 +252,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.6.1';
+var APP_VERSION='4.7';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -284,9 +284,15 @@ function fmtH(min){if(!isFinite(min))min=0;return (Math.round(min)/60).toFixed(2
 function fmtHM(min){min=Math.round(min);var h=Math.floor(min/60),m=min%60;
   return h>0?(h+' h '+String(m).padStart(2,'0')+' m'):(m+' m');}
 function entryMinutes(e){var a=new Date(e.startISO).getTime(),b=new Date(e.endISO).getTime();
-  return (isFinite(a)&&isFinite(b)&&b>a)?(b-a)/60000:0;}
+  var g=(isFinite(a)&&isFinite(b)&&b>a)?(b-a)/60000:0;
+  return Math.max(0,g-(Number(e.lunchMin)||0));}
 function projectMinutes(pid){return data.timeEntries.filter(function(e){return e.projectId===pid;})
   .reduce(function(s,e){return s+entryMinutes(e);},0);}
+function isMine(e){ return !sbUser||!e.userId||e.userId===sbUser.id; }
+function myProjectMinutes(pid){ return data.timeEntries.filter(function(e){return e.projectId===pid&&isMine(e);})
+  .reduce(function(s,e){return s+entryMinutes(e);},0); }
+var CABLE_TYPES=['CAT6 Riser','CAT6 Plenum','Controlled Access Cable','2 Conductor Cable','4 Conductor Cable','6 Conductor Cable'];
+var CABLE_COLORS=['Blue','Black','White','Gray','Red','Green','Yellow','Orange','Purple','Brown'];
 function projectCableFt(pid){return data.pulls.filter(function(x){return x.projectId===pid;})
   .reduce(function(s,x){return s+(Number(x.used)||0);},0);}
 function toLocalInput(d){var p=function(n){return String(n).padStart(2,'0');};
@@ -486,7 +492,7 @@ function renderTimer(){
     h+='<div class="card"><p class="mut">No active projects. Create one on the Projects tab first.</p></div>';
   }
   var todayKey=dayOfTs(Date.now()), tmins=0, pset={};
-  data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===todayKey){ tmins+=entryMinutes(e); pset[e.projectId]=1; } });
+  data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===todayKey && isMine(e)){ tmins+=entryMinutes(e); pset[e.projectId]=1; } });
   var nproj=Object.keys(pset).length;
   h+='<div class="card"><div class="mut">Today so far</div><b style="font-size:1.15rem">'+fmtHM(tmins)+(nproj?' across '+nproj+' project'+(nproj>1?'s':''):'')+'</b></div>';
   $('app').innerHTML=h;
@@ -530,7 +536,7 @@ function dashboardHTML(){
   var greet=gp.greet, dateStr=gp.date;
   var todayKey=dayOfTs(now.getTime());
   var tmins=0, pset={};
-  data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===todayKey){ tmins+=entryMinutes(e); pset[e.projectId]=1; } });
+  data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===todayKey && isMine(e)){ tmins+=entryMinutes(e); pset[e.projectId]=1; } });
   var nproj=Object.keys(pset).length;
   var pct=Math.min(tmins/480,1);
   var C=2*Math.PI*30;
@@ -541,7 +547,7 @@ function dashboardHTML(){
   var days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; var wmin=[], wmax=0, i, k, s;
   var weekKeys={};
   for(i=0;i<7;i++){ var d=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i); k=dayOfTs(d.getTime()); weekKeys[k]=1; s=0;
-    data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===k) s+=entryMinutes(e); });
+    data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===k && isMine(e)) s+=entryMinutes(e); });
     wmin.push(s); if(s>wmax)wmax=s; }
   var weekTotal=wmin.reduce(function(a,b){return a+b;},0);
   var cft=0, cn=0;
@@ -579,12 +585,10 @@ function dashboardHTML(){
   };
   var chartH=chartHTML(72), chartHD=chartHTML(210);
   var ev=[];
-  data.timeEntries.forEach(function(e){ var t=new Date(e.startISO).getTime(); ev.push({t:isFinite(t)?t:0,type:'time',e:e}); });
-  data.pulls.forEach(function(p){ var t=p.createdAt||(p.date?new Date(p.date+'T12:00:00').getTime():0); ev.push({t:isFinite(t)?t:0,type:'pull',e:p}); });
-  data.materials.forEach(function(m){ ev.push({t:m.createdAt||0,type:'mat',e:m}); });
+  data.timeEntries.forEach(function(e){ if(e.startISO && e.startISO.slice(0,10)===todayKey && (e.notes||'').trim() && isMine(e)){ var t=new Date(e.startISO).getTime(); ev.push({t:isFinite(t)?t:0,type:'time',e:e}); } });
   ev.sort(function(a,b){return b.t-a.t;}); ev=ev.slice(0,5);
   var actH='<div class="card dashfeed"><div class="cardhd"><h3>Recent activity</h3></div>';
-  if(!ev.length) actH+='<p class="mut">Nothing yet — log time, cable or materials and it will show up here.</p>';
+  if(!ev.length) actH+='<p class="mut">No entries with notes yet today.</p>';
   ev.forEach(function(it){ actH+=feedItem(it); });
   actH+='</div>';
   h+='<div class="mobi">'+chartH+'</div>';
@@ -644,7 +648,7 @@ function renderProjects(){
       +'<div class="cmenu" id="cmenu-'+p.id+'" style="display:none"><button onclick="event.stopPropagation();exportProject(\''+p.id+'\')">Export</button><button class="danger" onclick="event.stopPropagation();delProject(\''+p.id+'\')">Delete</button></div></div></div>'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">'
       +tbadge(done?'closed':'active',done?'#a33333':'#1e7a46')
-      +'<b style="font-size:1.35rem;color:'+pc+'">'+fmtHM(projectMinutes(p.id))+'</b></div></div>';
+      +'<b style="font-size:1.35rem;color:'+pc+'">'+fmtHM(myProjectMinutes(p.id))+'</b></div></div>';
   });
   h+='</div>';
   h+='<button class="fab" aria-label="New project" onclick="fabNewProject()">+</button>';
@@ -987,6 +991,8 @@ function timeHTML(p){
     +'<label>Kind</label><div class="seg" id="teSeg">'
     +KINDS.map(function(k,i){return '<button type="button" data-k="'+k+'" class="'+(i===1?'act':'')+'" onclick="segPick(\'teSeg\',this)">'+k+'</button>';}).join('')+'</div>'
     +'<label>Notes</label><textarea id="te_notes" rows="2" placeholder="What was done" oninput="autoGrow(this)"></textarea>'
+    +'<label style="font-weight:700;color:var(--text);margin-top:12px">Deductions</label>'
+    +'<label>Lunch (minutes)</label><input id="te_lunch" type="number" inputmode="numeric" min="0" placeholder="0">'
     +'<button class="btn" onclick="saveTimeEntry()">'+(teEditId?'Save changes':'Add entry')+'</button>'
     +(teEditId?'<button class="btn sec" style="margin-top:8px" onclick="teEditId=null;render()">Cancel edit</button>':'')
     +'</div>';
@@ -1003,7 +1009,7 @@ function timeHTML(p){
     byDay[d].forEach(function(e){
       var an=entryAuthorName(p,e),ce=canEditEntry(p,e);
       h+='<div class="kv"><span>'+esc(e.startISO.slice(11,16))+'–'+esc(e.endISO.slice(11,16))
-        +' · '+esc(e.kind)+(an?' · <span class="mut">'+esc(an)+'</span>':'')+(e.notes?'<br><span class="mut">'+esc(e.notes)+'</span>':'')+'</span>'
+        +' · '+esc(e.kind)+(an?' · <span class="mut">'+esc(an)+'</span>':'')+((e.notes||e.lunchMin)?'<br><span class="mut">'+(e.notes?esc(e.notes):'')+(e.notes&&e.lunchMin?' · ':'')+(e.lunchMin?'lunch '+e.lunchMin+' min':'')+'</span>':'')+'</span>'
         +'<span style="white-space:nowrap"><b>'+fmtHM(entryMinutes(e))+'</b>'
         +(ce?'<button class="edt" onclick="editTimeEntry(\''+e.id+'\')">Edit</button>'
         +'<button class="del" onclick="delTimeEntry(\''+e.id+'\')">Del</button>':'')+'</span></div>';});
@@ -1024,17 +1030,20 @@ function saveTimeEntry(){
   var sr=snapRange(new Date(start),new Date(end));
   start=toLocalInput(sr[0]);end=toLocalInput(sr[1]);
   var kind=segVal('teSeg'),notes=val('te_notes');
+  var lunch=Math.max(0,parseInt(val('te_lunch'),10)||0);
+  if(lunch>=(sr[1]-sr[0])/60000){toast('Lunch must be shorter than the entry');return;}
   if(teEditId){var en=data.timeEntries.filter(function(x){return x.id===teEditId;})[0];
     if(en&&!canEditEntry(projById(en.projectId),en)){toast('You can only edit your own entries');return;}
-    if(en){en.startISO=start;en.endISO=end;en.kind=kind;en.notes=notes;}teEditId=null;}
+    if(en){en.startISO=start;en.endISO=end;en.kind=kind;en.notes=notes;en.lunchMin=lunch;}teEditId=null;}
   else data.timeEntries.push({id:uid(),projectId:view.id,kind:kind,startISO:start,endISO:end,
-    notes:notes,source:'manual',userId:(sbUser?sbUser.id:'')});
+    notes:notes,source:'manual',userId:(sbUser?sbUser.id:''),lunchMin:lunch});
   save();render();toast('Entry saved ('+fmtClock(sr[0])+'\u2013'+fmtClock(sr[1])+')');}
 function editTimeEntry(id){var e=data.timeEntries.filter(function(x){return x.id===id;})[0];if(!e)return;
   if(!canEditEntry(projById(e.projectId),e)){toast('You can only edit your own entries');return;}
   teEditId=id;render();
   $('te_date').value=e.startISO.slice(0,10);$('te_start').value=e.startISO.slice(11,16);
   $('te_end').value=e.endISO.slice(11,16);$('te_notes').value=e.notes||'';autoGrow($('te_notes'));
+  var lf=$('te_lunch'); if(lf) lf.value=e.lunchMin||'';
   var seg=$('teSeg');Array.prototype.forEach.call(seg.children,function(c){
     c.className=c.getAttribute('data-k')===e.kind?'act':'';});
   window.scrollTo(0,0);}
@@ -1055,9 +1064,10 @@ function cableHTML(p){
     boxes[key].used+=Number(x.used)||0;boxes[key].rows.push(x);});
   var boxNames=Object.keys(boxes);
   var h=modHero(p,'Cable',projectCableFt(p.id)+' ft')+'<div class="card"><h3>Add cable pull</h3>'
-    +'<div class="row"><div><label>Cable type</label><input id="cp_run" placeholder="e.g. Cat6"></div>'
-    +'<div><label>Box label</label><input id="cp_box" list="boxlist" value="Box 1">'
-    +'<datalist id="boxlist">'+boxNames.map(function(b){return '<option value="'+esc(b)+'">';}).join('')+'</datalist></div></div>'
+    +'<div class="row"><div><label>Cable type</label><select id="cp_run">'
+    +CABLE_TYPES.map(function(t){return '<option>'+esc(t)+'</option>';}).join('')+'</select></div>'
+    +'<div><label>Cable Color</label><select id="cp_box">'
+    +CABLE_COLORS.map(function(c){return '<option>'+esc(c)+'</option>';}).join('')+'</select></div></div>'
     +'<label>Box size (ft)</label><input id="cp_size" type="number" inputmode="decimal" value="1000">'
     +'<label>Markings on the box</label><div class="seg">'
     +'<button type="button" id="pm_range" class="'+(pullMode==='range'?'act':'')+'" onclick="setPullMode(\'range\')">Previous + newest</button>'
@@ -1410,7 +1420,7 @@ function entryCopyListHTML(p){
     var matHtml=mats.length?'<br>'+mats.map(function(m){
       return '<span style="color:#a8c8e8">\u2022 '+esc(matLine(m))+'</span>';}).join('<br>'):'';
     return '<div class="kv"><span style="flex:1 1 auto;min-width:0"><b>'+esc(dl)+' \u00b7 '+esc(tl)+'</b><br><span class="mut">'
-      +esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+(entryAuthorName(p,e)?' \u00b7 '+esc(entryAuthorName(p,e)):'')+(e.notes?' \u00b7 '+esc(e.notes):'')+matHtml+'</span></span>'
+      +esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+(entryAuthorName(p,e)?' \u00b7 '+esc(entryAuthorName(p,e)):'')+(e.notes?' \u00b7 '+esc(e.notes):'')+(e.lunchMin?' \u00b7 lunch '+e.lunchMin+' min':'')+matHtml+'</span></span>'
       +'<button class="btn sec sml" style="align-self:center;flex:0 0 auto;margin-left:12px" onclick="copyEntry(\''+e.id+'\')">Copy</button></div>';
   }).join('');
   if(total>30)h+='<p class="mut">Showing the 30 most recent entries.</p>';
@@ -1424,7 +1434,7 @@ function copyEntry(eid){
   L.push(p.name+(p.ticket?'  |  CW #'+p.ticket:''));
   if(p.customer)L.push('Customer: '+p.customer+(p.site?'  |  Site: '+p.site:''));
   L.push(e.startISO.slice(0,10)+'  |  '+fmtH(entryMinutes(e)));
-  L.push('  '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(entryAuthorName(p,e)?'  \u00b7  '+entryAuthorName(p,e):'')+(e.notes?'  \u2014  '+e.notes:''));
+  L.push('  '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(entryAuthorName(p,e)?'  \u00b7  '+entryAuthorName(p,e):'')+(e.notes?'  \u2014  '+e.notes:'')+(e.lunchMin?'  \u00b7  lunch '+e.lunchMin+' min':''));
   var mats=matsForEntry(e);
   if(mats.length){ L.push('  Materials:'); mats.forEach(function(m){ L.push('  '+matLine(m)); }); }
   copyText(L.join('\n'));
@@ -1457,7 +1467,7 @@ function connectwiseNotes(p){
         var nm=k?(entryAuthorName(p,byUser[k][0])||'Unattributed'):'Unattributed';
         L.push('  '+nm+' — '+fmtH(umin));
         byUser[k].forEach(function(e){
-          L.push('    '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(e.notes?'  —  '+e.notes:''));});
+          L.push('    '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(e.notes?'  —  '+e.notes:'')+(e.lunchMin?'  ·  lunch '+e.lunchMin+' min':''));});
       });
       L.push('');
     });
@@ -1468,7 +1478,8 @@ function connectwiseNotes(p){
   L.push('----------------------------------------');
   var byType={};
   data.pulls.filter(function(x){return x.projectId===p.id;}).forEach(function(x){
-    var t=x.run||'Unspecified';byType[t]=(byType[t]||0)+(Number(x.used)||0);});
+    var t=x.run||'Unspecified'; if(x.box&&CABLE_COLORS.indexOf(x.box)>=0) t+=' ('+x.box+')';
+    byType[t]=(byType[t]||0)+(Number(x.used)||0);});
   var types=Object.keys(byType);
   if(!types.length)L.push('No cable pulls logged.');
   else types.forEach(function(t){L.push(t+': '+byType[t]+' ft');});
@@ -1848,6 +1859,7 @@ function toDB(table,r,isNew){
       o.project_id=r.projectId||null; o.kind=r.kind||null;
       o.start_iso=r.startISO||null; o.end_iso=r.endISO||null;
       o.notes=r.notes||null; o.source=r.source||null;
+      if(typeof r.lunchMin==='number') o.lunch_min=r.lunchMin;
       if(isNew&&sbUser) o.user_id=sbUser.id; break;
     case 'cable_pulls':
       o.project_id=r.projectId||null; o.run=r.run||null; o.box=r.box||null;
@@ -1889,6 +1901,7 @@ function fromDB(table,r){
       o.startISO=r.start_iso||''; o.endISO=r.end_iso||'';
       o.notes=r.notes||''; o.source=r.source||'';
       o.userId=r.user_id||'';
+      o.lunchMin=numOrNull(r.lunch_min)||0;
       o.createdAt=tsOf(r.created_at); break;
     case 'cable_pulls':
       o.projectId=r.project_id||''; o.run=r.run||''; o.box=r.box||'';
