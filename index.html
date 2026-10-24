@@ -252,7 +252,7 @@ window.FK={
 };
 /* ============ data layer ============ */
 var LS_KEY='fk_data_v1';
-var APP_VERSION='4.5.2';
+var APP_VERSION='4.6';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -389,6 +389,7 @@ function renderTabBar(){
   }).join('');
 }
 function render(skipTrack){
+  pendingRemote=false; formDirty=false; hideUpdPill();
   renderHdrMenu();
   renderDeskSide();
   var _bm=$('btnMore'); if(_bm) _bm.style.display='';
@@ -505,7 +506,7 @@ function stopTimer(){
   var r=snapRange(new Date(data.timer.startISO),new Date());
   var mins=Math.round((r[1]-r[0])/60000);
   data.timeEntries.push({id:uid(),projectId:data.timer.projectId,kind:data.timer.kind,
-    startISO:toLocalInput(r[0]),endISO:toLocalInput(r[1]),notes:'',source:'timer'});
+    startISO:toLocalInput(r[0]),endISO:toLocalInput(r[1]),notes:'',source:'timer',userId:(sbUser?sbUser.id:'')});
   data.timer=null;save();render();
   toast('Time entry saved ('+fmtHM(mins)+', '+fmtClock(r[0])+'\u2013'+fmtClock(r[1])+')');}
 </script>
@@ -884,6 +885,19 @@ function tbadge(label,color){
 function cwTag(p){ return p&&p.ticket?' <span class="tbadge" style="background:#1d5c96">CW #'+esc(p.ticket)+'</span>':''; }
 function cwSuffix(p){ return p&&p.ticket?' \u00b7 CW #'+esc(p.ticket):''; }
 function profLabel(pr){ if(!pr) return ''; var n=String(pr.display_name||'').trim(); return n||pr.email||''; }
+var authorLabels={};
+function entryAuthorName(p,e){
+  if(!p||!e||!e.userId) return '';
+  var mc=memberCache[p.id];
+  if(mc&&mc.labels&&mc.labels[e.userId]) return mc.labels[e.userId];
+  return authorLabels[e.userId]||'';
+}
+function canEditEntry(p,e){
+  if(!e||!e.userId) return true;
+  if(!sbUser) return true;
+  if(e.userId===sbUser.id) return true;
+  return !!(p&&p.owner_id&&p.owner_id===sbUser.id);
+}
 function profilesQ(ids,orderEmail){
   function build(cols){ var q=sb.from('profiles').select(cols); if(ids)q=q.in('id',ids); if(orderEmail)q=q.order('email'); return q; }
   return build('id,email,display_name').then(function(r){
@@ -901,9 +915,10 @@ function loadMembers(pid,force){
     if(r.error){ memberCache[pid]={failed:true}; if(view.name==='project'&&view.id===pid)render(); return; }
     var ids=(r.data||[]).map(function(m){return m.user_id;});
     var ownerId=p.owner_id||sbUser.id;
+    data.timeEntries.forEach(function(e){ if(e.projectId===pid&&e.userId&&e.userId!==ownerId&&ids.indexOf(e.userId)<0) ids.push(e.userId); });
     profilesQ(ids.concat([ownerId])).then(function(r2){
-      var labels={}; (r2.data||[]).forEach(function(pr){labels[pr.id]=profLabel(pr);});
-      memberCache[pid]={ownerId:ownerId,ownerLabel:labels[ownerId]||'you',
+      var labels={}; (r2.data||[]).forEach(function(pr){labels[pr.id]=profLabel(pr); authorLabels[pr.id]=labels[pr.id];});
+      memberCache[pid]={labels:labels,ownerId:ownerId,ownerLabel:labels[ownerId]||'you',
         members:(r.data||[]).filter(function(m){return m.user_id!==ownerId;})
           .map(function(m){return{id:m.user_id,label:labels[m.user_id]||String(m.user_id).slice(0,8)+'…'};})};
       if(view.name==='project'&&view.id===pid)render();
@@ -986,11 +1001,12 @@ function timeHTML(p){
     h+='<h4>'+esc(d)+' — '+fmtHM(dayMin)+'</h4><div class="mut" style="margin-bottom:6px">'
       +Object.keys(kindMin).map(function(k){return esc(k)+': '+fmtHM(kindMin[k]);}).join(' · ')+'</div>';
     byDay[d].forEach(function(e){
+      var an=entryAuthorName(p,e),ce=canEditEntry(p,e);
       h+='<div class="kv"><span>'+esc(e.startISO.slice(11,16))+'–'+esc(e.endISO.slice(11,16))
-        +' · '+esc(e.kind)+(e.notes?'<br><span class="mut">'+esc(e.notes)+'</span>':'')+'</span>'
+        +' · '+esc(e.kind)+(an?' · <span class="mut">'+esc(an)+'</span>':'')+(e.notes?'<br><span class="mut">'+esc(e.notes)+'</span>':'')+'</span>'
         +'<span style="white-space:nowrap"><b>'+fmtHM(entryMinutes(e))+'</b>'
-        +'<button class="edt" onclick="editTimeEntry(\''+e.id+'\')">Edit</button>'
-        +'<button class="del" onclick="delTimeEntry(\''+e.id+'\')">Del</button></span></div>';});
+        +(ce?'<button class="edt" onclick="editTimeEntry(\''+e.id+'\')">Edit</button>'
+        +'<button class="del" onclick="delTimeEntry(\''+e.id+'\')">Del</button>':'')+'</span></div>';});
   });
   h+='</div>';
   return h;
@@ -1009,18 +1025,22 @@ function saveTimeEntry(){
   start=toLocalInput(sr[0]);end=toLocalInput(sr[1]);
   var kind=segVal('teSeg'),notes=val('te_notes');
   if(teEditId){var en=data.timeEntries.filter(function(x){return x.id===teEditId;})[0];
+    if(en&&!canEditEntry(projById(en.projectId),en)){toast('You can only edit your own entries');return;}
     if(en){en.startISO=start;en.endISO=end;en.kind=kind;en.notes=notes;}teEditId=null;}
   else data.timeEntries.push({id:uid(),projectId:view.id,kind:kind,startISO:start,endISO:end,
-    notes:notes,source:'manual'});
+    notes:notes,source:'manual',userId:(sbUser?sbUser.id:'')});
   save();render();toast('Entry saved ('+fmtClock(sr[0])+'\u2013'+fmtClock(sr[1])+')');}
 function editTimeEntry(id){var e=data.timeEntries.filter(function(x){return x.id===id;})[0];if(!e)return;
+  if(!canEditEntry(projById(e.projectId),e)){toast('You can only edit your own entries');return;}
   teEditId=id;render();
   $('te_date').value=e.startISO.slice(0,10);$('te_start').value=e.startISO.slice(11,16);
   $('te_end').value=e.endISO.slice(11,16);$('te_notes').value=e.notes||'';autoGrow($('te_notes'));
   var seg=$('teSeg');Array.prototype.forEach.call(seg.children,function(c){
     c.className=c.getAttribute('data-k')===e.kind?'act':'';});
   window.scrollTo(0,0);}
-function delTimeEntry(id){if(!confirm('Delete this time entry?'))return;
+function delTimeEntry(id){var e=data.timeEntries.filter(function(x){return x.id===id;})[0];
+  if(e&&!canEditEntry(projById(e.projectId),e)){toast('You can only delete your own entries');return;}
+  if(!confirm('Delete this time entry?'))return;
   data.timeEntries=data.timeEntries.filter(function(e){return e.id!==id;});save();render();}
 </script>
 
@@ -1390,7 +1410,7 @@ function entryCopyListHTML(p){
     var matHtml=mats.length?'<br>'+mats.map(function(m){
       return '<span style="color:#a8c8e8">\u2022 '+esc(matLine(m))+'</span>';}).join('<br>'):'';
     return '<div class="kv"><span style="flex:1 1 auto;min-width:0"><b>'+esc(dl)+' \u00b7 '+esc(tl)+'</b><br><span class="mut">'
-      +esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+(e.notes?' \u00b7 '+esc(e.notes):'')+matHtml+'</span></span>'
+      +esc(e.kind)+' \u00b7 '+fmtHM(entryMinutes(e))+(entryAuthorName(p,e)?' \u00b7 '+esc(entryAuthorName(p,e)):'')+(e.notes?' \u00b7 '+esc(e.notes):'')+matHtml+'</span></span>'
       +'<button class="btn sec sml" style="align-self:center;flex:0 0 auto;margin-left:12px" onclick="copyEntry(\''+e.id+'\')">Copy</button></div>';
   }).join('');
   if(total>30)h+='<p class="mut">Showing the 30 most recent entries.</p>';
@@ -1404,7 +1424,7 @@ function copyEntry(eid){
   L.push(p.name+(p.ticket?'  |  CW #'+p.ticket:''));
   if(p.customer)L.push('Customer: '+p.customer+(p.site?'  |  Site: '+p.site:''));
   L.push(e.startISO.slice(0,10)+'  |  '+fmtH(entryMinutes(e)));
-  L.push('  '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(e.notes?'  \u2014  '+e.notes:''));
+  L.push('  '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(entryAuthorName(p,e)?'  \u00b7  '+entryAuthorName(p,e):'')+(e.notes?'  \u2014  '+e.notes:''));
   var mats=matsForEntry(e);
   if(mats.length){ L.push('  Materials:'); mats.forEach(function(m){ L.push('  '+matLine(m)); }); }
   copyText(L.join('\n'));
@@ -1430,8 +1450,15 @@ function connectwiseNotes(p){
       grand+=dayMin;
       L.push(d+'  |  '+fmtH(dayMin));
       KINDS.forEach(function(k){if(kindMin[k])L.push('  '+k+': '+fmtH(kindMin[k]));});
-      byDay[d].forEach(function(e){
-        L.push('  '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(e.notes?'  —  '+e.notes:''));});
+      var byUser={},uOrder=[];
+      byDay[d].forEach(function(e){ var k=e.userId||''; if(!byUser[k]){byUser[k]=[];uOrder.push(k);} byUser[k].push(e); });
+      uOrder.forEach(function(k){
+        var umin=0; byUser[k].forEach(function(e){umin+=entryMinutes(e);});
+        var nm=k?(entryAuthorName(p,byUser[k][0])||'Unattributed'):'Unattributed';
+        L.push('  '+nm+' — '+fmtH(umin));
+        byUser[k].forEach(function(e){
+          L.push('    '+e.startISO.slice(11,16)+'-'+e.endISO.slice(11,16)+'  '+e.kind+(e.notes?'  —  '+e.notes:''));});
+      });
       L.push('');
     });
     L.push('Total time: '+fmtH(grand));
@@ -1821,7 +1848,7 @@ function toDB(table,r,isNew){
       o.project_id=r.projectId||null; o.kind=r.kind||null;
       o.start_iso=r.startISO||null; o.end_iso=r.endISO||null;
       o.notes=r.notes||null; o.source=r.source||null;
-      if(sbUser) o.user_id=sbUser.id; break;
+      if(isNew&&sbUser) o.user_id=sbUser.id; break;
     case 'cable_pulls':
       o.project_id=r.projectId||null; o.run=r.run||null; o.box=r.box||null;
       o.box_size=r.boxSize||null; o.mode=r.mode||null; o.prev=r.prev||null;
@@ -1861,6 +1888,7 @@ function fromDB(table,r){
       o.projectId=r.project_id||''; o.kind=r.kind||'';
       o.startISO=r.start_iso||''; o.endISO=r.end_iso||'';
       o.notes=r.notes||''; o.source=r.source||'';
+      o.userId=r.user_id||'';
       o.createdAt=tsOf(r.created_at); break;
     case 'cable_pulls':
       o.projectId=r.project_id||''; o.run=r.run||''; o.box=r.box||'';
@@ -2253,7 +2281,7 @@ function syncNow(manual){
       save();
     }finally{ merging=false; }
     setSyncStatus('ok');
-    if(changed) render();
+    if(changed) applyRemoteChanged(true);
     if(manual) toast(changed?'Sync complete':'Already up to date');
     return changed;
   }).catch(function(e){
@@ -2278,6 +2306,31 @@ function subscribeRealtime(){
     rtChannel.subscribe();
   }catch(e){ rtChannel=null; }
 }
+var pendingRemote=false, formDirty=false;
+document.addEventListener('input',function(){ formDirty=true; });
+function uiBusy(){
+  if(document.querySelector('.dlg-ov')) return true;
+  if(typeof teEditId!=='undefined'&&teEditId) return true;
+  if(formDirty) return true;
+  var ae=document.activeElement;
+  if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&ae.id!=='cw_notes') return true;
+  return false;
+}
+function showUpdPill(){
+  var el=document.getElementById('updPill');
+  if(!el){ el=document.createElement('button'); el.id='updPill'; el.className='btn grn';
+    el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:55;box-shadow:0 6px 24px rgba(0,0,0,.5);width:auto;padding:10px 18px;border-radius:999px';
+    el.textContent='Teammate update — tap to refresh';
+    el.onclick=function(){ pendingRemote=false; el.style.display='none'; render(); };
+    document.body.appendChild(el); }
+  el.style.display='block';
+}
+function hideUpdPill(){ var el=document.getElementById('updPill'); if(el) el.style.display='none'; }
+function applyRemoteChanged(quiet){
+  if(uiBusy()){ pendingRemote=true; showUpdPill(); return; }
+  pendingRemote=false; render();
+  if(!quiet) toast('Updated from another device');
+}
 function queuePull(){
   if(!sb||!sbUser||syncing) return;
   if(pullTimer) clearTimeout(pullTimer);
@@ -2289,7 +2342,7 @@ function queuePull(){
         // NOTE: lastSynced is intentionally NOT updated here — only a successful
         // push+pull in syncNow may advance it, otherwise failed pushes would
         // look synced and never be retried.
-        if(changed){ save(); render(); toast('Updated from another device'); }
+        if(changed){ save(); applyRemoteChanged(false); }
       }finally{ merging=false; }
     }).catch(function(){ merging=false; });
   },1500);

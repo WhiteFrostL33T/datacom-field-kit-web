@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v4.5.2
+**Current version:** v4.6
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v4.6** — Per-user time entries: every entry shows who logged it, the ConnectWise log groups entries by person with per-person totals, you can only edit your own entries (the project owner can edit anyone's), and a teammate's save no longer repaints over a form you're filling in — you get a tap-to-refresh pill instead.
 
 - **v4.5.2** — Sync fix: projects shared with you after your last sync now arrive with their history; projects you are removed from leave your device
 
