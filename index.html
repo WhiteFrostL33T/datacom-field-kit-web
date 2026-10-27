@@ -100,6 +100,13 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
   align-items:center;justify-content:center;padding:20px;}
 .dlg{background:var(--panel);border:1px solid var(--line);border-radius:20px;
   max-width:420px;width:100%;max-height:80vh;overflow:auto;padding:18px;}
+.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px;}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;}
+.stat b{display:block;font-size:1.65rem;line-height:1.15;font-weight:800;}
+.stat span{color:var(--muted);font-size:.8rem;}
+.stat.hot b{color:#8fb8ff;}
+.stat.warn b{color:#ff9a9a;}
+button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
 .seclbl{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px;}
 .bigtime{font-size:2.4rem;font-weight:800;text-align:center;letter-spacing:2px;margin:8px 0 12px;font-variant-numeric:tabular-nums;}
 .ver{display:inline-block;background:var(--chip);border:1px solid var(--line);color:#aeb8ff;
@@ -184,6 +191,9 @@ th{color:var(--muted);font-weight:600;font-size:.8rem;text-transform:uppercase;l
   .deskflex{display:flex;}
   .deskStats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px;}
   .deskStats .card{margin:0;}
+  .statgrid{grid-template-columns:repeat(4,1fr);}
+  .secgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start;}
+  .secgrid .card{margin:0;}
   .deskHome2{display:grid;grid-template-columns:1fr;gap:12px;align-items:start;}
   .deskHome2 .card{margin:0;}
 }
@@ -251,7 +261,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.0';
+var APP_VERSION='5.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1799,6 +1809,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.1',items:['Admin view redesigned: stat tiles on top, Crew / Users / Projects sections (3 columns on desktop)','Recycle bin now opens as a floating window from the In recycle bin tile — deleted projects moved out of the Projects list into the window']},
  {v:'5.0',items:['Your data now lives on the server: the app loads fresh from Supabase on launch and saves straight to the database — no copy kept on the phone, no more sync issues','Running timers live on the server too, so a timer follows you across devices','Admin: new Crew section in the Admin view — who is on the clock and crew hours this week','Activity log: Mine / Crew toggle, and rows show who last edited them','Deleted projects stay restorable for 30 days (Admin \u2192 Recycle bin)','Live updates: teammates\u2019 changes refresh automatically']},
  {v:'4.8',items:['Activity log now groups entries by day, each day headed with its totals (time, cable feet, materials)','Projects: jobs you touched in the last 7 days sit in a This week band above the full list','New Daily timesheet: the whole day across all projects on one screen - edit entries in place, a timeline bar on top, amber flags for gaps and overlaps']},
  {v:'4.7.1',items:['About page: changelog caught up - entries for 4.6, 4.6.1 and 4.7 were missing and are in now']},
@@ -2627,6 +2638,16 @@ function renderAdmin(){
     return pr?profLabel(pr):(sbUser&&id===sbUser.id?sbUser.email:String(id).slice(0,8)+'\u2026'); };
   var h='<div style="margin:4px 2px 12px"><div style="font-size:1.55rem;font-weight:800">Admin</div>'
     +'<div class="mut">Users, projects and repairs \u2014 visible only to admins.</div></div>';
+  var actProjs=d.projects.filter(function(p){return !p.deleted_at&&(p.status||'active')!=='done';});
+  var delProjs=d.projects.filter(function(p){return !!p.deleted_at;});
+  h+='<div class="statgrid">'
+    +'<div class="stat"><b>'+d.profiles.length+'</b><span>Users</span></div>'
+    +'<div class="stat"><b>'+actProjs.length+'</b><span>Active projects</span></div>'
+    +'<div class="stat hot"><b>'+crewTimers.length+'</b><span>On the clock</span></div>'
+    +'<button class="stat warn" onclick="openBinDialog()"><b>'+delProjs.length+'</b><span>In recycle bin \u203a</span></button>'
+    +'</div>';
+  h+='<div class="secgrid">';
+  h+=crewAdminHTML();
   h+='<div class="card"><h3>Users ('+d.profiles.length+')</h3>';
   d.profiles.forEach(function(pr){
     var adm=d.admins.indexOf(pr.id)>=0;
@@ -2652,16 +2673,15 @@ function renderAdmin(){
     }
   });
   h+='</div>';
-  h+=crewAdminHTML();
-  h+='<div class="card"><h3>All projects ('+d.projects.length+')</h3>';
-  d.projects.slice().sort(function(a,b){return String(b.created_at||'')<String(a.created_at||'')?-1:1;}).forEach(function(pr){
+  h+='<div class="card"><h3>Projects ('+actProjs.length+')</h3>';
+  actProjs.slice().sort(function(a,b){return String(b.created_at||'')<String(a.created_at||'')?-1:1;}).forEach(function(pr){
     var mem=d.members.filter(function(x){return x.project_id===pr.id;});
     h+='<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(pr.name)+'</b>'
-      +(pr.deleted_at?'<span class="tbadge" style="background:#a33333">deleted</span>':'')
+      
       +'<span class="mut">owner '+esc(labelOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</span>'
       +'<span class="cardmenu" style="margin-left:auto"><button class="iconbtn" aria-label="Project actions" onclick="event.stopPropagation();toggleAdminMenu(\'p-'+pr.id+'\')">&#8942;</button>'
       +'<span class="cmenu" id="amenu-p-'+pr.id+'" style="display:none">'
-      +(pr.deleted_at?'<button onclick="adminRestoreProject(\''+pr.id+'\')">Restore</button>':'')
+      
       +'<button class="danger" onclick="adminPurgeConfirm(\''+pr.id+'\')">Delete permanently</button>'
       +'</span></span>'
       +'</div>'
@@ -2674,12 +2694,37 @@ function renderAdmin(){
       +'</div>';
   });
   h+='</div>';
-  h+='<div class="card"><h3>Recycle bin</h3><p class="mut">Deleted projects stay restorable for 30 days. Restore brings back the project and everything deleted with it.</p>'
-    +'<button class="btn sec" onclick="adminPurgeOldDeleted()">Delete permanently everything deleted 30+ days ago</button></div>';
+  h+='</div>';
   h+='<div style="height:80px"></div>';
   h+='<button class="fab" onclick="openCreateUser()" aria-label="Create user">+</button>';
   $('app').innerHTML=h;
 }
+function openBinDialog(){
+  closeBinDialog();
+  var d=adminData||{projects:[]};
+  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var shortD=function(ts){var x=new Date(ts);return MON[x.getMonth()]+' '+x.getDate();};
+  var del=d.projects.filter(function(p){return !!p.deleted_at;})
+    .slice().sort(function(a,b){return new Date(b.deleted_at)-new Date(a.deleted_at);});
+  var rows=del.length?del.map(function(pr){
+    var until=new Date(new Date(pr.deleted_at).getTime()+30*864e5);
+    return '<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0"><b>'+esc(pr.name)+'</b>'
+      +'<div class="mut" style="font-size:.8rem">Deleted '+esc(shortD(pr.deleted_at))+' \u00b7 restorable until '+esc(shortD(until))+'</div></span>'
+      +'<button class="btn" style="flex:none;width:auto;min-height:36px;padding:8px 14px;" onclick="binRestore(\''+pr.id+'\')">Restore</button></div>';
+  }).join(''):'<p class="mut">Nothing in the recycle bin.</p>';
+  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='binDlg';
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Recycle bin</h3>'
+    +'<span class="tbadge" style="background:#a33333">'+del.length+' deleted</span></div>'
+    +rows
+    +'<p class="mut" style="margin:10px 0">Deleted projects stay restorable for 30 days. Restore brings back the project and everything deleted with it.</p>'
+    +(del.length?'<button class="btn sec" style="width:100%" onclick="binPurge()">Delete permanently everything deleted 30+ days ago</button>':'')
+    +'<button class="btn" style="width:100%;margin-top:12px" onclick="closeBinDialog()">Done</button></div>';
+  ov.addEventListener('click',function(e){ if(e.target===ov) closeBinDialog(); });
+  document.body.appendChild(ov);
+}
+function closeBinDialog(){ var o=document.getElementById('binDlg'); if(o) o.remove(); }
+function binRestore(pid){ closeBinDialog(); adminRestoreProject(pid); }
+function binPurge(){ closeBinDialog(); adminPurgeOldDeleted(); }
 function toggleAdminMenu(key){
   var m=$('amenu-'+key);if(!m)return;var was=m.style.display!=='none';
   Array.prototype.forEach.call(document.querySelectorAll('.cardmenu .cmenu'),function(x){x.style.display='none';});

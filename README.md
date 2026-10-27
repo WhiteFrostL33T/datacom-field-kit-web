@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v5.0
+**Current version:** v5.1
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v5.1** — Admin dashboard redesign: stat tiles on top, Crew / Users / Projects sections (3 columns on desktop), recycle bin opens as a floating window from the In recycle bin tile
 
 - **v5.0** — Server-only data: the app loads fresh from Supabase on launch and saves straight to the database — no copy kept on the phone, no more sync issues. Running timers live on the server and follow you across devices. Admin: new Crew section in the Admin view (who is on the clock, crew hours this week). Activity log: Mine / Crew toggle, plus edited-by stamps. Deleted projects stay restorable for 30 days (Admin -> Recycle bin). Live updates: teammates' changes refresh automatically.
 
