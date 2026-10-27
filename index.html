@@ -251,8 +251,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var LS_KEY='fk_data_v1';
-var APP_VERSION='4.8';
+var APP_VERSION='5.0';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -262,20 +261,27 @@ function allModuleKeys(){return MODULES.map(function(m){return m[0];});}
 function defaultData(){return {projects:[],timeEntries:[],timer:null,pulls:[],
   storageCalcs:{},poeSwitches:[],poeDevices:[],ipAssignments:[],ipSubnets:{},
   portSwitches:[],portEntries:[],materials:[],matPicks:[]};}
-var data;
-try{data=JSON.parse(localStorage.getItem(LS_KEY))||defaultData();}catch(e){data=defaultData();}
-(function(){var d=defaultData();for(var k in d){if(data[k]===undefined)data[k]=d[k];}})();
-(function(){var dirty=false;(data.projects||[]).forEach(function(p){
-  if(p.technicians&&p.technicians.length){p.technicians=[];dirty=true;}});
-  if(dirty){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}catch(e){}}})();
-function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}catch(e){toast('Storage full / unavailable');}queueSync();}
+var data=defaultData();
+var ioChain=Promise.resolve();
+function save(){
+  // v5.0 write-through: every mutation pushes its diff to the server.
+  // Optimistic: the UI already shows the change. A failed push refetches
+  // server truth and re-renders, discarding the failed change (no queue).
+  if(!sb||!sbUser||!serverSnap) return;
+  ioChain=ioChain.then(function(){ return pushChangesDiff(serverSnap); })
+    .then(function(){ serverSnap=syncableSnapshot(); setSyncStatus('ok'); })
+    .catch(function(){
+      toast('Save failed \u2014 reloading from server');
+      return fetchAllFromServer().then(function(){ render(); renderTimerBar(); }).catch(function(){});
+    });
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
   .replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function $(id){return document.getElementById(id);}
 function val(id){var e=$(id);return e?e.value.trim():'';}
 function num(id){var v=parseFloat(val(id));return isFinite(v)?v:0;}
-function toast(msg){var t=$('toast');t.textContent=msg;t.className='show';
+function toast(msg){var t=$('toast');if(!t)return;t.textContent=msg;t.className='show';
   clearTimeout(t._h);t._h=setTimeout(function(){t.className='';},2600);}
 function projById(id){return data.projects.filter(function(p){return p.id===id;})[0]||null;}
 function enabledMods(p){var m=(p.enabledModules&&p.enabledModules.length)?p.enabledModules.slice():allModuleKeys();
@@ -378,7 +384,7 @@ function renderDeskSide(){
       h+='<button class="dsproj" onclick="openProject(\''+p.id+'\')"><span style="width:10px;height:10px;border-radius:50%;background:'+projColor(p)+';flex:0 0 auto"></span><span style="flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.name)+'</span></button>';
     });
   }
-  h+='<div style="margin-top:auto;padding-top:16px"><div class="dssync"><span style="width:9px;height:9px;border-radius:50%;background:var(--green);flex:0 0 auto"></span>'+esc(syncStatusText())+'</div></div>';
+  h+='<div style="margin-top:auto;padding-top:16px"><div class="dssync"><span style="width:9px;height:9px;border-radius:50%;background:var(--green);flex:0 0 auto"></span>'+esc(syncStatusText())+'</div><button class="btn sec" style="margin-top:8px;width:100%" onclick="refreshFromServer(true)">Refresh from server</button></div>';
   el.innerHTML=h;
 }
 function deskFilter(q){
@@ -460,7 +466,7 @@ function quickStartTimer(){
   startTimer(pid,qsKind);}
 function switchTimerKind(k){
   if(!data.timer)return;
-  data.timer.kind=k; save(); render();
+  data.timer.kind=k; save(); pushTimerRow(); render();
   toast('Timer kind: '+k);
 }
 function renderTimer(){
@@ -508,9 +514,44 @@ function renderTimer(){
   h+='<div class="card"><div class="mut">Today so far</div><b style="font-size:1.15rem">'+fmtHM(tmins)+(nproj?' across '+nproj+' project'+(nproj>1?'s':''):'')+'</b></div>';
   $('app').innerHTML=h;
 }
+/* ---------- server timer row (v5.0) ---------- */
+// One row per user in running_timers: start upserts, stop deletes, and a
+// launch fetch restores the timer on any device (cross-device timers, F6).
+function pushTimerRow(){
+  if(!sb||!sbUser) return Promise.resolve();
+  if(!data.timer)
+    return sb.from('running_timers').delete().eq('user_id',sbUser.id).then(function(){},function(){});
+  return sb.from('running_timers').upsert(
+    {user_id:sbUser.id,project_id:data.timer.projectId,kind:data.timer.kind,started_at:data.timer.startISO},
+    {onConflict:'user_id'}).then(function(){},function(){});
+}
+function loadOwnTimer(){
+  if(!sb||!sbUser) return Promise.resolve();
+  return sb.from('running_timers').select('*').eq('user_id',sbUser.id).maybeSingle().then(function(r){
+    if(r.error||!r.data){ data.timer=null; return; }
+    var row=r.data;
+    if(!projById(row.project_id)){
+      // Its project is gone: drop the orphan row, do not resurrect the timer.
+      data.timer=null;
+      sb.from('running_timers').delete().eq('user_id',sbUser.id).then(function(){},function(){});
+      return;
+    }
+    data.timer={projectId:row.project_id,kind:row.kind,startISO:row.started_at};
+  }).catch(function(){});
+}
+function onTimerRowChanged(){
+  // Own row changed (started/stopped on another device) or, for admins,
+  // any crew row changed: refetch and update the bar + dashboard block.
+  loadOwnTimer().then(function(){
+    if(isAdmin) return loadCrewTimers();
+  }).then(function(){
+    renderTimerBar();
+    if((view.name==='dashboard'||view.name==='admin')&&!uiBusy()) render();
+  });
+}
 function startTimer(pid,kind){
   if(data.timer){toast('A timer is already running — stop it first');return;}
-  data.timer={projectId:pid,kind:kind,startISO:new Date().toISOString()};save();render();
+  data.timer={projectId:pid,kind:kind,startISO:new Date().toISOString()};save();pushTimerRow();render();
   toast('Timer started ('+kind+')');}
 function snap15(d){ return new Date(Math.round(d.getTime()/900000)*900000); }
 function snapRange(start,end){
@@ -524,7 +565,7 @@ function stopTimer(){
   var mins=Math.round((r[1]-r[0])/60000);
   data.timeEntries.push({id:uid(),projectId:data.timer.projectId,kind:data.timer.kind,
     startISO:toLocalInput(r[0]),endISO:toLocalInput(r[1]),notes:'',source:'timer',userId:(sbUser?sbUser.id:'')});
-  data.timer=null;save();render();
+  data.timer=null;save();pushTimerRow();render();
   toast('Time entry saved ('+fmtHM(mins)+', '+fmtClock(r[0])+'\u2013'+fmtClock(r[1])+')');}
 </script>
 
@@ -540,6 +581,36 @@ function greetParts(){
 }
 function renderDashboard(){
   $('app').innerHTML=dashboardHTML();
+}
+/* ---------- crew (v5.0, admin) ---------- */
+var crewTimers=[], crewTimersLoaded=false;
+function loadCrewTimers(){
+  if(!sb||!sbUser||!isAdmin) return Promise.resolve();
+  crewTimersLoaded=true; // set at fetch start: a failed fetch must not re-trigger on every render
+  return sb.from('running_timers').select('*').then(function(r){
+    if(!r.error&&r.data) crewTimers=r.data;
+  }).catch(function(){});
+}
+function crewAdminHTML(){
+  var h='<div class="card"><div class="cardhd"><h3>Crew</h3></div>';
+  if(!crewTimers.length) h+='<p class="mut">Nobody on the clock right now.</p>';
+  else crewTimers.forEach(function(t){
+    var p=projById(t.project_id);
+    var mins=Math.max(0,Math.floor((Date.now()-new Date(t.started_at).getTime())/60000));
+    h+='<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0"><span><b>'+esc(authorLabels[t.user_id]||'Teammate')+'</b> \u00b7 '+esc(t.kind)+' \u00b7 '+esc(p?p.name:'?')+'</span><span class="mut" style="white-space:nowrap">'+fmtHM(mins)+'</span></div>';
+  });
+  var dow=(new Date().getDay()+6)%7, mon=new Date(); mon.setDate(mon.getDate()-dow);
+  var weekKeys={};
+  for(var i=0;i<7;i++){ var d=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i); weekKeys[dayOfTs(d.getTime())]=1; }
+  var byUser={};
+  data.timeEntries.forEach(function(e){
+    if(e.startISO&&weekKeys[e.startISO.slice(0,10)]) byUser[e.userId||'']=(byUser[e.userId||'']||0)+entryMinutes(e);
+  });
+  h+='<div class="seclbl">Hours this week</div>';
+  Object.keys(byUser).forEach(function(uid){
+    h+='<div style="display:flex;justify-content:space-between;padding:6px 0"><span>'+esc(authorLabels[uid]||(sbUser&&uid===sbUser.id?'You':'Teammate'))+'</span><b>'+fmtHM(byUser[uid])+'</b></div>';
+  });
+  return h+'</div>';
 }
 function dashboardHTML(){
   var now=new Date();
@@ -1024,7 +1095,7 @@ function timeHTML(p){
     byDay[d].forEach(function(e){
       var an=entryAuthorName(p,e),ce=canEditEntry(p,e);
       h+='<div class="kv"><span>'+esc(e.startISO.slice(11,16))+'–'+esc(e.endISO.slice(11,16))
-        +' · '+esc(e.kind)+(an?' · <span class="mut">'+esc(an)+'</span>':'')+((e.notes||e.lunchMin)?'<br><span class="mut">'+(e.notes?esc(e.notes):'')+(e.notes&&e.lunchMin?' · ':'')+(e.lunchMin?'lunch '+e.lunchMin+' min':'')+'</span>':'')+'</span>'
+        +' · '+esc(e.kind)+(an?' · <span class="mut">'+esc(an)+'</span>':'')+(e.updatedBy&&e.updatedBy!==e.userId?' · <span class="mut">edited by '+esc(authorLabels[e.updatedBy]||'teammate')+'</span>':'')+((e.notes||e.lunchMin)?'<br><span class="mut">'+(e.notes?esc(e.notes):'')+(e.notes&&e.lunchMin?' · ':'')+(e.lunchMin?'lunch '+e.lunchMin+' min':'')+'</span>':'')+'</span>'
         +'<span style="white-space:nowrap"><b>'+fmtHM(entryMinutes(e))+'</b>'
         +(ce?'<button class="edt" onclick="editTimeEntry(\''+e.id+'\')">Edit</button>'
         +'<button class="del" onclick="delTimeEntry(\''+e.id+'\')">Del</button>':'')+'</span></div>';});
@@ -1519,14 +1590,32 @@ function matPicksHTML(){
       +'<button type="button" style="background:none;border:none;color:var(--text);font:inherit;padding:8px 2px 8px 12px;cursor:pointer;white-space:nowrap" onclick="matPickIdx('+i+')">'+esc(pk.name)+'</button>'
       +'<button type="button" style="background:none;border:none;color:var(--mut);font:inherit;padding:8px 11px 8px 5px;cursor:pointer" onclick="delMatPick('+i+')" title="Remove pick">\u00d7</button></span>';}).join('')+'</div>';
   return h;}
+/* ---------- user preferences row (v5.0) ---------- */
+// Material quick-picks follow the user across devices (D3) via one
+// user_preferences row. Prefs are NOT part of the generic save() diff
+// (matPicks is not a synced table), so mutations save prefs explicitly.
+function loadPrefs(){
+  if(!sb||!sbUser) return Promise.resolve();
+  return sb.from('user_preferences').select('mat_picks').eq('user_id',sbUser.id).maybeSingle().then(function(r){
+    if(r.data&&Array.isArray(r.data.mat_picks)) data.matPicks=r.data.mat_picks;
+  }).catch(function(){});
+}
+function savePrefs(){
+  if(!sb||!sbUser) return;
+  sb.from('user_preferences').upsert({user_id:sbUser.id,mat_picks:data.matPicks||[]},{onConflict:'user_id'})
+    .then(function(){},function(){});
+}
+function onPrefsRowChanged(){
+  loadPrefs().then(function(){ if(!uiBusy()) render(); });
+}
 function delMatPick(i){if(!confirm('Remove this quick pick?'))return;
-  (data.matPicks||[]).splice(i,1);save();render();}
+  (data.matPicks||[]).splice(i,1);save();savePrefs();render();}
 function learnMatPick(name,unit){
   if(!data.matPicks)data.matPicks=[];
   var nl=name.toLowerCase();
   var known=data.matPicks.some(function(pk){return pk.name.toLowerCase()===nl;});
   if(!known){data.matPicks.unshift({name:name,unit:unit});
-    if(data.matPicks.length>10)data.matPicks.length=10;}}
+    if(data.matPicks.length>10)data.matPicks.length=10;savePrefs();}}
 function saveMaterial(){
   var name=val('mt_name'),qty=parseFloat(val('mt_qty'));
   if(!name){toast('Item name required');return;}
@@ -1565,13 +1654,18 @@ function feedItem(it){
     if(it.e.notes)sub+=' \u00b7 '+it.e.notes;
     when=it.t?fmtFeedDate(it.t):'';
   }
+  if(it.type==='time'&&!isMine(it.e)&&it.e.userId) sub=(authorLabels[it.e.userId]||'Teammate')+' \u00b7 '+sub;
+  if(it.e.updatedBy&&it.e.updatedBy!==it.e.userId) sub+=' \u00b7 edited by '+(authorLabels[it.e.updatedBy]||'teammate');
   return '<div class="feeditem"><div class="fic">'+icons[it.type]+'</div>'
     +'<div class="fib"><b>'+esc(title)+'</b><div class="mut">'+esc(sub)+'</div></div>'
     +'<div class="ftime">'+esc(when)+'</div></div>';
 }
+var actCrew=true; // Activity tab: true = everyone's entries (v5.0 default, as before), false = mine only
+function setActFeed(v){ actCrew=v; renderActivity(); }
 function renderActivity(){
   var ev=[];
   data.timeEntries.forEach(function(e){
+    if(!actCrew&&!isMine(e)) return;
     var t=new Date(e.startISO).getTime();if(!isFinite(t))t=0;
     ev.push({t:t,type:'time',e:e});});
   data.pulls.forEach(function(p){
@@ -1580,7 +1674,9 @@ function renderActivity(){
   data.materials.forEach(function(m){ev.push({t:m.createdAt||0,type:'mat',e:m});});
   ev.sort(function(a,b){return b.t-a.t;});
   ev=ev.slice(0,40);
-  var h='<div class="card"><h3>Activity log</h3>';
+  var h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3>Activity log</h3><div class="seg">'
+    +'<button type="button" class="'+(actCrew?'':'act')+'" onclick="setActFeed(false)">Mine</button>'
+    +'<button type="button" class="'+(actCrew?'act':'')+'" onclick="setActFeed(true)">Crew</button></div></div>';
   if(!ev.length)h+='<p class="mut">Nothing yet \u2014 log time, cable or materials and it will show up here.</p>';
   var days={},order=[];
   ev.forEach(function(it){
@@ -1703,6 +1799,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.0',items:['Your data now lives on the server: the app loads fresh from Supabase on launch and saves straight to the database — no copy kept on the phone, no more sync issues','Running timers live on the server too, so a timer follows you across devices','Admin: new Crew section in the Admin view — who is on the clock and crew hours this week','Activity log: Mine / Crew toggle, and rows show who last edited them','Deleted projects stay restorable for 30 days (Admin \u2192 Recycle bin)','Live updates: teammates\u2019 changes refresh automatically']},
  {v:'4.8',items:['Activity log now groups entries by day, each day headed with its totals (time, cable feet, materials)','Projects: jobs you touched in the last 7 days sit in a This week band above the full list','New Daily timesheet: the whole day across all projects on one screen - edit entries in place, a timeline bar on top, amber flags for gaps and overlaps']},
  {v:'4.7.1',items:['About page: changelog caught up - entries for 4.6, 4.6.1 and 4.7 were missing and are in now']},
  {v:'4.7',items:['Dashboard and project cards now count only your own hours (inside a project, totals still show everyone combined)','Recent activity shows only your entries from today that have notes','Cable: type and Cable Color are now dropdowns; the ConnectWise notes total cable by type and color','Time entries: new Lunch (minutes) deduction under Deductions in Add/Edit - every total comes out net of it']},
@@ -1795,7 +1892,7 @@ function trackNav(push){
   var s=JSON.stringify(navState());
   if(push&&s!==lastNav){lastNav=s;try{history.pushState(navState(),'');}catch(e){}}
   else if(!push){lastNav=s;}
-  try{localStorage.setItem('fk_view',s);}catch(e){}
+  // v5.0: the last view is not persisted; every launch lands on Dashboard.
 }
 window.addEventListener('popstate',function(e){
   var s=e.state;
@@ -1808,9 +1905,9 @@ window.addEventListener('popstate',function(e){
 var SUPABASE_URL='https://dsmgmkstxdfohwoujkkw.supabase.co';
 var SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzbWdta3N0eGRmb2h3b3Vqa2t3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxNDA5NzcsImV4cCI6MjEwNzcxNjk3N30.FonsXvWywH9zLrQui82l4sqU3GegEMMrH7KWvKffM9A';
 var sb=null, sbUser=null, sbReady=false;
-var syncing=false, merging=false, syncTimer=null, pullTimer=null, rtChannel=null;
-var lastSynced=null;
-var syncMeta={migrated:false,lastPull:null,uid:null};
+var syncing=false, refreshTimer=null, rtChannel=null;
+var serverSnap=null; // v5.0: last-known server state, memory only, never persisted
+var fetchVisibleProjects={}, fetchVisibleCount=0;
 var syncStatus='idle', syncStatusAt=null, pendingView=null;
 
 function initSupabase(){
@@ -1819,14 +1916,6 @@ function initSupabase(){
     sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
     sbReady=true;
   }catch(e){ sb=null; sbReady=false; }
-}
-function loadSyncMeta(){
-  try{ var m=JSON.parse(localStorage.getItem('fk_sync_meta')||'null'); if(m) syncMeta=m; }catch(e){}
-  try{ var s=JSON.parse(localStorage.getItem('fk_sync_snap')||'null'); if(s) lastSynced=s; }catch(e){}
-}
-function saveSyncMeta(){
-  try{localStorage.setItem('fk_sync_meta',JSON.stringify(syncMeta));}catch(e){}
-  try{localStorage.setItem('fk_sync_snap',JSON.stringify(lastSynced));}catch(e){}
 }
 
 /* ---------- auth ---------- */
@@ -1850,39 +1939,67 @@ function bootAuth(){
     else if(ev==='SIGNED_OUT') onSignedOut();
   });
 }
+
 function onSignedIn(session,keepView){
-  var uid=session.user.id;
-  loadSyncMeta();
-  if(syncMeta.uid&&syncMeta.uid!==uid){
-    resetSyncableData();
-    syncMeta={migrated:true,lastPull:null,uid:uid};
-    lastSynced=syncableSnapshot();
-    saveSyncMeta();
-    toast('Signed in — loading your projects');
-  }else if(!syncMeta.uid){
-    syncMeta.uid=uid; saveSyncMeta();
-  }
   sbUser=session.user;
   checkAdmin();
   if(!keepView){ view={name:'dashboard'}; curTab='overview'; }
   else if(view.name==='login'){ view={name:'dashboard'}; }
-  render();
-  if(!syncMeta.migrated){
-    lastSynced=emptySnapshot();
-    toast('First sync — uploading your data…');
-    syncNow(false).then(function(){ syncMeta.migrated=true; saveSyncMeta(); toast('Sync complete'); });
-  }else{
-    syncNow(false);
-  }
+  $('app').innerHTML='<div class="card" style="max-width:420px;margin:48px auto;text-align:center"><p class="mut">Loading your projects…</p></div>';
+  initialLoad();
   subscribeRealtime();
+}
+function initialLoad(){
+  $('app').innerHTML='<div class="card" style="max-width:420px;margin:48px auto;text-align:center"><p class="mut">Loading your projects…</p></div>';
+  setSyncStatus('refreshing');
+  migrateLocalOnce().then(function(){ return fetchAllFromServer(); }).then(function(){
+    var jobs=[loadPrefs(),loadOwnTimer()];
+    if(isAdmin) jobs.push(loadCrewTimers());
+    return Promise.all(jobs);
+  }).then(function(){
+    setSyncStatus('ok');
+    render(); renderTimerBar();
+  }).catch(function(e){
+    syncErrMsg=(e&&e.message)||'unknown error'; setSyncStatus('offline'); renderOffline();
+  });
+}
+function migrateLocalOnce(){
+  // One-time v4.x -> v5.0 migration: if a local copy + snapshot exist, push
+  // only the true local diff (local vs lastSynced), then delete local keys.
+  // On push failure the keys are kept so the next launch can retry.
+  var raw=null, snapRaw=null;
+  try{ raw=localStorage.getItem('fk_data_v1'); }catch(e){}
+  try{ snapRaw=localStorage.getItem('fk_sync_snap'); }catch(e){}
+  if(!raw){
+    try{localStorage.removeItem('fk_sync_meta');localStorage.removeItem('fk_sync_snap');localStorage.removeItem('fk_view');}catch(e){}
+    return Promise.resolve();
+  }
+  var localData, snap;
+  try{ localData=JSON.parse(raw); snap=JSON.parse(snapRaw||'null')||emptySnapshot(); }catch(e){ return Promise.resolve(); }
+  var savedData=data; data=localData;
+  return pushChangesDiff(snap).then(function(){
+    data=defaultData();
+    try{localStorage.removeItem('fk_data_v1');localStorage.removeItem('fk_sync_meta');localStorage.removeItem('fk_sync_snap');localStorage.removeItem('fk_view');}catch(e){}
+  },function(err){
+    data=savedData;
+    throw err;
+  });
+}
+function renderOffline(){
+  $('hdrsub').textContent='Offline';
+  $('app').innerHTML='<div class="card" style="max-width:420px;margin:48px auto;text-align:center">'
+    +'<h2 style="margin:0 0 8px">No connection</h2>'
+    +'<p class="mut">Field Kit loads your projects from the server, and the server could not be reached.</p>'
+    +'<button class="btn pri" style="width:100%;margin-top:12px" onclick="initialLoad()">Retry</button></div>';
 }
 function onSignedOut(){
   memberCache={};
   isAdmin=false; adminCheckedFor=null; adminData=null;
   sbUser=null;
+  data=defaultData(); serverSnap=null; crewTimers=[];
+  try{localStorage.removeItem('fk_data_v1');localStorage.removeItem('fk_sync_meta');localStorage.removeItem('fk_sync_snap');localStorage.removeItem('fk_view');}catch(e){}
   if(rtChannel){ try{sb.removeChannel(rtChannel);}catch(e){} rtChannel=null; }
-  if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
-  if(pullTimer){clearTimeout(pullTimer);pullTimer=null;}
+  if(refreshTimer){clearTimeout(refreshTimer);refreshTimer=null;}
   view={name:'login'}; render();
 }
 function doLogin(){
@@ -1906,7 +2023,7 @@ function renderLogin(){
   var tb=$('timerbar'); tb.style.display='none'; tb.innerHTML='';
   $('app').innerHTML='<div class="card" style="max-width:420px;margin:48px auto">'
     +'<div style="text-align:center;margin-bottom:18px"><h2 style="margin:0 0 6px">Field Kit</h2>'
-    +'<p class="mut" style="margin:0">Sign in to sync your projects</p></div>'
+    +'<p class="mut" style="margin:0">Sign in to load your projects</p></div>'
     +'<div id="login_err"></div>'
     +'<label class="mut" style="font-size:.8rem">Email</label>'
     +'<input id="li_email" type="email" autocomplete="username" style="width:100%;margin:4px 0 10px">'
@@ -1983,6 +2100,8 @@ function toDB(table,r,isNew){
       o.name=r.name||''; o.customer=r.customer||null; o.site=r.site||null;
       o.ticket=r.ticket||null; o.notes=r.notes||null; o.status=r.status||'active';
       o.enabled_modules=r.enabledModules||[];
+      if(r.deleted_at) o.deleted_at=r.deleted_at;
+      if(sbUser) o.updated_by=sbUser.id;
       if(isNew&&sbUser) o.owner_id=sbUser.id;
       break;
     case 'time_entries':
@@ -2016,6 +2135,7 @@ function toDB(table,r,isNew){
       o.project_id=r.projectId||null; o.ip=r.ip||'';
       o.device=r.device||null; o.notes=r.notes||null; break;
   }
+  if(sbUser) o.updated_by=sbUser.id;
   return o;
 }
 function fromDB(table,r){
@@ -2025,6 +2145,7 @@ function fromDB(table,r){
       o.name=r.name||''; o.customer=r.customer||''; o.site=r.site||'';
       o.ticket=r.ticket||''; o.notes=r.notes||''; o.status=r.status||'active';
       o.enabledModules=r.enabled_modules||[]; o.owner_id=r.owner_id||null;
+      o.deleted_at=r.deleted_at||null; o.updatedBy=r.updated_by||null;
       o.createdAt=tsOf(r.created_at); o.technicians=[]; break;
     case 'time_entries':
       o.projectId=r.project_id||''; o.kind=r.kind||'';
@@ -2059,6 +2180,7 @@ function fromDB(table,r){
       o.projectId=r.project_id||''; o.ip=r.ip||''; o.device=r.device||'';
       o.notes=r.notes||''; o.createdAt=tsOf(r.created_at); break;
   }
+  o.updatedBy=r.updated_by||null;
   return o;
 }
 
@@ -2073,70 +2195,7 @@ function leftProjectIds(snap){
   });
   return left;
 }
-function reconcileSnapshot(base){
-  // Self-heal "phantom" projects: rows the snapshot believes are synced
-  // but that do not exist on the server (their child rows then fail RLS
-  // forever and wedge the whole sync). Own phantoms are evicted from the
-  // snapshot so they and their records re-upload; other people's phantoms
-  // are flagged so their rows get skipped instead of wedging the push.
-  if(!sb||!sbUser||!base||!(base.projects||[]).length) return Promise.resolve(base);
-  return sb.from('projects').select('id').then(function(r){
-    if(r.error||!r.data) return base;
-    var server={}; r.data.forEach(function(x){ server[x.id]=1; });
-    var localById={}; (data.projects||[]).forEach(function(p){ localById[p.id]=p; });
-    var own={}, ghost={}, purge={};
-    (base.projects||[]).forEach(function(p){
-      if(!p) return;
-      // Admin-purged projects are evicted unconditionally: never
-      // re-uploaded, never tombstoned - simply gone.
-      if(purgedSet[p.id]){ purge[p.id]=1; return; }
-      if(server[p.id]||!localById[p.id]) return;
-      if(!p.owner_id||p.owner_id===sbUser.id) own[p.id]=1; else ghost[p.id]=1;
-    });
-    Object.keys((base.settings)||{}).forEach(function(pid){ if(purgedSet[pid]) purge[pid]=1; });
-    if(!Object.keys(own).length&&!Object.keys(ghost).length&&!Object.keys(purge).length) return base;
-    var evict={}; Object.keys(own).forEach(function(k){evict[k]=1;}); Object.keys(purge).forEach(function(k){evict[k]=1;});
-    var snap=JSON.parse(JSON.stringify(base));
-    var sw={};
-    (snap.poeSwitches||[]).concat(snap.portSwitches||[]).forEach(function(s){ if(evict[s.projectId]) sw[s.id]=1; });
-    snap.projects=(snap.projects||[]).filter(function(p){ return !evict[p.id]; });
-    ['timeEntries','pulls','materials','ipAssignments','poeSwitches','portSwitches'].forEach(function(k){
-      snap[k]=(snap[k]||[]).filter(function(x){ return !evict[x.projectId]; });
-    });
-    ['poeDevices','portEntries'].forEach(function(k){
-      snap[k]=(snap[k]||[]).filter(function(x){ return !sw[x.switchId]; });
-    });
-    Object.keys(evict).forEach(function(pid){
-      if(snap.techNames) delete snap.techNames[pid];
-      if(snap.settings) delete snap.settings[pid];
-    });
-    snap.__ghostIds=ghost;
-    return snap;
-  },function(){ return base; });
-}
-function pushChanges(){
-  if(!sb||!sbUser) return Promise.resolve();
-  var base=lastSynced||emptySnapshot();
-  return fetchPurged().then(function(){ return reconcileSnapshot(base); })
-    .then(function(snap){ return pushChangesDiff(snap); });
-}
-function fetchPurged(){
-  // Projects an admin deleted permanently (purged_projects): drop any
-  // local copy instead of re-uploading it, and remember the ids so
-  // reconcileSnapshot evicts their snapshot rows too. Fails open - if
-  // the table is not there yet, sync proceeds exactly as before.
-  purgedSet={};
-  if(!sb||!sbUser) return Promise.resolve();
-  return sb.from('purged_projects').select('project_id').then(function(r){
-    if(r.error||!r.data) return;
-    r.data.forEach(function(x){ purgedSet[x.project_id]=1; });
-    var hit=false;
-    Object.keys(purgedSet).forEach(function(pid){
-      if(projById(pid)){ pruneLocalProject(pid); hit=true; }
-    });
-    if(hit) syncNote='A project deleted permanently by an admin was removed from this device';
-  },function(){});
-}
+
 function pushChangesDiff(snap){
   var leftIds=leftProjectIds(snap);
   if(snap.__ghostIds) for(var g in snap.__ghostIds) leftIds[g]=1;
@@ -2294,87 +2353,35 @@ function mergeRow(cfg,row){
   }
   arr.push(obj); return true;
 }
-function pullChanges(){
+
+function fetchAllFromServer(){
+  // v5.0: full fetch, every time. No incremental window, no lastPull.
+  // Absence = gone, so a prune pass runs after all tables resolve.
   if(!sb||!sbUser) return Promise.resolve(false);
-  var since=syncMeta.lastPull||'1970-01-01T00:00:00.000Z';
   var changed=false;
-  var jobs=[];
-  // Projects are pulled in FULL, never incrementally: being granted
-  // membership does not bump a project's updated_at, so a timestamp
-  // pull silently skips projects shared with you after your last sync
-  // (Braeden, 2026-10-22: member of 8, phone held 5, syncs "fine").
-  // The visible list is small - reconcile it on every sync.
+  var localProjCount=data.projects.length;
   var cfgOf=function(key){ for(var i=0;i<SYNC_TABLES.length;i++) if(SYNC_TABLES[i].key===key) return SYNC_TABLES[i]; return null; };
+  var jobs=[];
+  var seen={};
+  SYNC_TABLES.forEach(function(cfg){ seen[cfg.table]={}; });
   var projCfg=cfgOf('projects');
   jobs.push(sb.from('projects').select('*').then(function(r){
     if(r.error) throw r.error;
-    var rows=r.data||[], visible={}, newPids=[];
+    var rows=r.data||[], visible={};
     rows.forEach(function(row){
-      visible[row.id]=1;
-      var isNew=!row.deleted_at&&idxById(data.projects,row.id)<0;
+      visible[row.id]=1; seen.projects[row.id]=1;
       if(mergeRow(projCfg,row)) changed=true;
-      if(isNew) newPids.push(row.id);
     });
-    // Absence = gone: membership removed, deleted on another device,
-    // or admin-purged. Push ran before pull, so a local project was
-    // already offered to the server - if it is not visible now, it is
-    // not ours to keep. An empty list against a non-empty snapshot is
-    // suspect, though: prune nothing then.
-    var snapCount=((lastSynced&&lastSynced.projects)||[]).length;
-    if(rows.length||!snapCount){
-      (data.projects||[]).slice().forEach(function(p){
-        if(!visible[p.id]){
-          pruneLocalProject(p.id); changed=true;
-          syncNote='A project that is no longer shared with you was removed from this device';
-        }
-      });
-    }
-    if(!newPids.length) return;
-    // Backfill: a just-arrived project's rows predate lastPull, so the
-    // incremental pulls below skip them. Fetch its data once, in full.
-    var bf=[];
-    newPids.forEach(function(pid){
-      ['timeEntries','pulls','materials','ipAssignments','poeSwitches','portSwitches'].forEach(function(k){
-        var cfg=cfgOf(k);
-        bf.push(sb.from(cfg.table).select('*').eq('project_id',pid).then(function(rr){
-          if(rr.error) throw rr.error;
-          (rr.data||[]).forEach(function(row){ if(mergeRow(cfg,row)) changed=true; });
-        }));
-      });
-    });
-    return Promise.all(bf).then(function(){
-      var bf2=[];
-      data.poeSwitches.concat(data.portSwitches).forEach(function(s){
-        if(newPids.indexOf(s.projectId)<0) return;
-        ['poeDevices','portEntries'].forEach(function(k){
-          var cfg=cfgOf(k);
-          bf2.push(sb.from(cfg.table).select('*').eq('switch_id',s.id).then(function(rr){
-            if(rr.error) throw rr.error;
-            (rr.data||[]).forEach(function(row){ if(mergeRow(cfg,row)) changed=true; });
-          }));
-        });
-      });
-      return Promise.all(bf2);
-    });
+    fetchVisibleProjects=visible;
+    fetchVisibleCount=rows.length;
   }));
   SYNC_TABLES.forEach(function(cfg){
     if(cfg.table==='projects') return;
-    jobs.push(sb.from(cfg.table).select('*').gt('updated_at',since).then(function(r){
+    jobs.push(sb.from(cfg.table).select('*').then(function(r){
       if(r.error) throw r.error;
-      (r.data||[]).forEach(function(row){ if(mergeRow(cfg,row)) changed=true; });
+      (r.data||[]).forEach(function(row){ seen[cfg.table][row.id]=1; if(mergeRow(cfg,row)) changed=true; });
     }));
   });
-  jobs.push(sb.from('technicians').select('*').is('deleted_at',null).then(function(r){
-    if(r.error) throw r.error;
-    var byProj={};
-    (r.data||[]).forEach(function(t){ (byProj[t.project_id]=byProj[t.project_id]||[]).push(t); });
-    Object.keys(byProj).forEach(function(pid){
-      byProj[pid].sort(function(a,b){ return tsOf(a.created_at)-tsOf(b.created_at); });
-    });
-    (data.projects||[]).forEach(function(p){
-      if((p.technicians||[]).length){ p.technicians=[]; changed=true; }
-    });
-  }));
   jobs.push(sb.from('project_settings').select('*').then(function(r){
     if(r.error) throw r.error;
     (r.data||[]).forEach(function(row){
@@ -2389,27 +2396,52 @@ function pullChanges(){
       }
     });
   }));
-  // v4.6.1 one-time heal: entries pulled before v4.6 never carried their
-  // author stamp locally, and the incremental pull above never refetches
-  // unchanged rows - so pre-4.6 history would stay unattributed forever.
-  // Fetch every visible time entry once, merge the stamps in, remember it.
-  if(!syncMeta.attrBackfill){
-    var teCfg=cfgOf('timeEntries');
-    if(teCfg) jobs.push(sb.from('time_entries').select('*').then(function(r){
-      if(r.error) throw r.error;
-      (r.data||[]).forEach(function(row){ if(mergeRow(teCfg,row)) changed=true; });
-      syncMeta.attrBackfill=true; saveSyncMeta();
-      var miss={}; data.timeEntries.forEach(function(e){ if(e.userId&&!authorLabels[e.userId]) miss[e.userId]=1; });
-      var missIds=Object.keys(miss);
-      if(!missIds.length) return;
-      return profilesQ(missIds).then(function(r2){
-        (r2.data||[]).forEach(function(pr){ var l=profLabel(pr); if(l){ authorLabels[pr.id]=l; changed=true; } });
-      }).catch(function(){});
-    }));
-  }
-  return Promise.all(jobs).then(function(){ return changed; });
+  return Promise.all(jobs).then(function(){
+    return fetchAuthorLabels();
+  }).then(function(lblChanged){
+    if(lblChanged) changed=true;
+    // Prune pass: full fetch means absence = gone.
+    if(fetchVisibleCount||!localProjCount){
+      var vis=fetchVisibleProjects;
+      (data.projects||[]).slice().forEach(function(p){
+        if(!vis[p.id]){ pruneLocalProject(p.id); changed=true; syncNote='A project that is no longer shared with you was removed from this device'; }
+      });
+    }
+    SYNC_TABLES.forEach(function(cfg){
+      if(cfg.table==='projects') return;
+      var s=seen[cfg.table];
+      data[cfg.key]=(data[cfg.key]||[]).filter(function(r){
+        if(cfg.key==='poeDevices') return data.poeSwitches.some(function(sw){return sw.id===r.switchId;});
+        if(cfg.key==='portEntries') return data.portSwitches.some(function(sw){return sw.id===r.switchId;});
+        return !!s[r.id];
+      });
+    });
+    Object.keys(data.storageCalcs||{}).forEach(function(pid){ if(!projById(pid)) delete data.storageCalcs[pid]; });
+    Object.keys(data.ipSubnets||{}).forEach(function(pid){ if(!projById(pid)) delete data.ipSubnets[pid]; });
+    if(data.timer&&data.timer.projectId&&!projById(data.timer.projectId)){
+      data.timer=null;
+      if(sb&&sbUser) sb.from('running_timers').delete().eq('user_id',sbUser.id).then(function(){},function(){});
+    }
+    serverSnap=syncableSnapshot();
+    return changed;
+  });
 }
-
+function fetchAuthorLabels(){
+  // Resolve display names for every author/editor id we hold but have not
+  // resolved yet (time authors, plus updated_by editors on all row kinds).
+  var miss={};
+  function add(id){ if(id&&!authorLabels[id]) miss[id]=1; }
+  data.timeEntries.forEach(function(e){ add(e.userId); add(e.updatedBy); });
+  data.pulls.forEach(function(x){ add(x.updatedBy); });
+  data.materials.forEach(function(m){ add(m.updatedBy); });
+  var missIds=Object.keys(miss);
+  if(!missIds.length) return Promise.resolve(false);
+  return profilesQ(missIds).then(function(r2){
+    var ch=false;
+    (r2.data||[]).forEach(function(pr){ var l=profLabel(pr); if(l){ authorLabels[pr.id]=l; ch=true; } });
+    return ch;
+  }).catch(function(){ return false; });
+}
 function setSyncStatus(s){
   syncStatus=s; syncStatusAt=Date.now();
   var el=document.getElementById('syncstat');
@@ -2417,40 +2449,34 @@ function setSyncStatus(s){
 }
 var syncErrMsg='';
 var syncNote='';
-var purgedSet={};
 function syncStatusText(){
-  if(syncStatus==='syncing') return 'Syncing…';
-  if(syncStatus==='offline') return syncErrMsg?('Sync error: '+syncErrMsg.slice(0,90)):'Offline — changes saved on this device';
-  if(syncStatusAt) return 'Synced '+new Date(syncStatusAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+(syncNote?'. Note: '+syncNote:'');
-  return 'Not synced yet';
+  if(syncStatus==='refreshing') return 'Refreshing…';
+  if(syncStatus==='offline') return syncErrMsg?('Server error: '+syncErrMsg.slice(0,90)):'Offline — showing last loaded data';
+  if(syncStatusAt) return 'Server · Updated '+new Date(syncStatusAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+(syncNote?'. Note: '+syncNote:'');
+  return 'Server · Not loaded yet';
 }
-function queueSync(){
-  if(merging||!sb||!sbUser) return;
-  if(syncTimer) clearTimeout(syncTimer);
-  syncTimer=setTimeout(function(){ syncTimer=null; syncNow(false); },2500);
+
+function queueRefresh(){
+  if(!sb||!sbUser||syncing) return;
+  if(refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer=setTimeout(function(){ refreshTimer=null; refreshFromServer(false); },1500);
 }
-function syncNow(manual){
+function refreshFromServer(manual){
+  // All fetches run through the ioChain so a refresh can never prune rows
+  // from a save that is still in flight.
   if(!sb||!sbUser||syncing) return Promise.resolve(false);
-  syncing=true; syncNote=''; setSyncStatus('syncing');
-  var pullStart=new Date().toISOString();
-  return pushChanges().then(function(){ return pullChanges(); }).then(function(changed){
-    merging=true;
-    try{
-      lastSynced=syncableSnapshot();
-      syncMeta.lastPull=pullStart;
-      saveSyncMeta();
-      save();
-    }finally{ merging=false; }
-    setSyncStatus('ok');
-    if(changed) applyRemoteChanged(true);
-    if(manual) toast(changed?'Sync complete':'Already up to date');
+  syncing=true; setSyncStatus('refreshing');
+  ioChain=ioChain.then(function(){ return fetchAllFromServer(); }).then(function(changed){
+    syncing=false; setSyncStatus('ok');
+    if(changed) applyRemoteChanged(!manual);
+    if(manual) toast(changed?'Refreshed':'Already up to date');
     return changed;
   }).catch(function(e){
-    syncErrMsg=(e&&e.message)||'unknown error';
-    setSyncStatus('offline');
-    if(manual) toast('Sync failed: '+syncErrMsg.slice(0,120));
+    syncing=false; syncErrMsg=(e&&e.message)||'unknown error'; setSyncStatus('offline');
+    if(manual) toast('Refresh failed: '+syncErrMsg.slice(0,120));
     return false;
-  }).then(function(r){ syncing=false; return r; });
+  });
+  return ioChain;
 }
 function subscribeRealtime(){
   if(rtChannel||!sb||!sbUser) return;
@@ -2458,10 +2484,12 @@ function subscribeRealtime(){
     rtChannel=sb.channel('fk-sync-'+sbUser.id);
     ['projects','technicians','time_entries','cable_pulls','materials','poe_switches',
      'poe_devices','port_switches','port_entries','ip_assignments','project_settings',
-     'project_members'].forEach(function(t){
+     'project_members','running_timers','user_preferences'].forEach(function(t){
       rtChannel.on('postgres_changes',{event:'*',schema:'public',table:t},function(){
         if(t==='project_members'&&view.name==='project') loadMembers(view.id,true);
-        queuePull();
+        if(t==='running_timers') return onTimerRowChanged();
+        if(t==='user_preferences') return onPrefsRowChanged();
+        queueRefresh();
       });
     });
     rtChannel.subscribe();
@@ -2493,23 +2521,6 @@ function applyRemoteChanged(quiet){
   pendingRemote=false; render();
   if(!quiet) toast('Updated from another device');
 }
-function queuePull(){
-  if(!sb||!sbUser||syncing) return;
-  if(pullTimer) clearTimeout(pullTimer);
-  pullTimer=setTimeout(function(){
-    pullTimer=null;
-    merging=true;
-    pullChanges().then(function(changed){
-      try{
-        // NOTE: lastSynced is intentionally NOT updated here — only a successful
-        // push+pull in syncNow may advance it, otherwise failed pushes would
-        // look synced and never be retried.
-        if(changed){ save(); applyRemoteChanged(false); }
-      }finally{ merging=false; }
-    }).catch(function(){ merging=false; });
-  },1500);
-}
-
 /* ---------- diagnostics ---------- */
 function jwtSub(){
   try{
@@ -2527,7 +2538,7 @@ function openDiag(){
   closeDiag();
   var ov=document.createElement('div');
   ov.className='dlg-ov'; ov.id='diagDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Sync diagnostics</h3></div>'
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Diagnostics</h3></div>'
     +'<div id="diag_body"><p class="mut">Checking…</p></div>'
     +'<button class="btn sec" style="width:100%;margin-top:12px" onclick="closeDiag()">Close</button></div>';
   ov.addEventListener('click',function(e){ if(e.target===ov) closeDiag(); });
@@ -2568,6 +2579,7 @@ function checkAdmin(){
   sb.from('admins').select('user_id').eq('user_id',sbUser.id).maybeSingle().then(function(r){
     isAdmin=!!(r&&r.data&&r.data.user_id);
     renderHdrMenu();
+    if(isAdmin){ loadCrewTimers().then(function(){ if((view.name==='dashboard'||view.name==='admin')&&!uiBusy()) render(); }); }
   },function(){ isAdmin=false; });
 }
 function loadAdminData(force){
@@ -2603,6 +2615,7 @@ function adminFn(action,payload,doneMsg){
 function renderAdmin(){
   if(!isAdmin){ $('app').innerHTML='<div class="card"><p class="mut">Admins only.</p></div>'; return; }
   loadAdminData();
+  if(!crewTimersLoaded&&sb){ loadCrewTimers().then(function(){ if(view.name==='admin'&&!uiBusy()) render(); }); }
   if(!adminData||adminData.loading){ $('app').innerHTML='<div class="card"><p class="mut">Loading admin data\u2026</p></div>'; return; }
   if(adminData.error){
     $('app').innerHTML='<div class="card"><h3>Admin</h3><div class="err">'+esc(adminData.error)+'</div>'
@@ -2639,6 +2652,7 @@ function renderAdmin(){
     }
   });
   h+='</div>';
+  h+=crewAdminHTML();
   h+='<div class="card"><h3>All projects ('+d.projects.length+')</h3>';
   d.projects.slice().sort(function(a,b){return String(b.created_at||'')<String(a.created_at||'')?-1:1;}).forEach(function(pr){
     var mem=d.members.filter(function(x){return x.project_id===pr.id;});
@@ -2647,7 +2661,7 @@ function renderAdmin(){
       +'<span class="mut">owner '+esc(labelOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</span>'
       +'<span class="cardmenu" style="margin-left:auto"><button class="iconbtn" aria-label="Project actions" onclick="event.stopPropagation();toggleAdminMenu(\'p-'+pr.id+'\')">&#8942;</button>'
       +'<span class="cmenu" id="amenu-p-'+pr.id+'" style="display:none">'
-      +(pr.deleted_at?'<button onclick="adminUntombstone(\''+pr.id+'\')">Restore</button>':'')
+      +(pr.deleted_at?'<button onclick="adminRestoreProject(\''+pr.id+'\')">Restore</button>':'')
       +'<button class="danger" onclick="adminPurgeConfirm(\''+pr.id+'\')">Delete permanently</button>'
       +'</span></span>'
       +'</div>'
@@ -2660,6 +2674,9 @@ function renderAdmin(){
       +'</div>';
   });
   h+='</div>';
+  h+='<div class="card"><h3>Recycle bin</h3><p class="mut">Deleted projects stay restorable for 30 days. Restore brings back the project and everything deleted with it.</p>'
+    +'<button class="btn sec" onclick="adminPurgeOldDeleted()">Delete permanently everything deleted 30+ days ago</button></div>';
+  h+='<div style="height:80px"></div>';
   h+='<button class="fab" onclick="openCreateUser()" aria-label="Create user">+</button>';
   $('app').innerHTML=h;
 }
@@ -2722,6 +2739,53 @@ function adminSetAdmin(uid,make){
   adminFn('setAdmin',{userId:uid,admin:make},make?'Admin granted':'Admin removed');
 }
 function adminUntombstone(pid){ adminFn('untombstone',{projectId:pid},'Project restored'); }
+function adminRestoreProject(pid){
+  // v5.0 client-side restore (no Edge Function deploy needed): the project
+  // row plus every child row deleted at-or-after the project's deletion
+  // (individually deleted children stay deleted).
+  var pr=((adminData&&adminData.projects)||[]).filter(function(x){return x.id===pid;})[0];
+  var ts=pr&&pr.deleted_at;
+  if(!pr||!ts){ toast('Project is not deleted'); return; }
+  if(!confirm('Restore "'+pr.name+'" and everything deleted with it?')) return;
+  var tables=['time_entries','cable_pulls','materials','poe_switches','port_switches','ip_assignments','technicians'];
+  var jobs=[sb.from('projects').update({deleted_at:null}).eq('id',pid)];
+  tables.forEach(function(t){
+    jobs.push(sb.from(t).update({deleted_at:null}).eq('project_id',pid).gte('deleted_at',ts));
+  });
+  function restoreSwitchKids(swTable,kidTable){
+    return sb.from(swTable).select('id,deleted_at').eq('project_id',pid).then(function(r){
+      var ids=(r.data||[]).filter(function(s){ return !s.deleted_at||s.deleted_at>=ts; }).map(function(s){ return s.id; });
+      if(!ids.length) return;
+      return sb.from(kidTable).update({deleted_at:null}).in('switch_id',ids).gte('deleted_at',ts);
+    });
+  }
+  jobs.push(restoreSwitchKids('poe_switches','poe_devices'));
+  jobs.push(restoreSwitchKids('port_switches','port_entries'));
+  Promise.all(jobs).then(function(){
+    toast('Project restored');
+    adminData=null; loadAdminData(true);
+    if(view.name==='admin') render();
+    refreshFromServer(false);
+  },function(e){ toast('Restore failed: '+((e&&e.message)||'error')); });
+}
+function adminPurgeOldDeleted(){
+  var old=((adminData&&adminData.projects)||[]).filter(function(x){
+    return x.deleted_at&&new Date(x.deleted_at).getTime()<Date.now()-30*864e5;
+  });
+  if(!old.length){ toast('Nothing deleted 30+ days ago'); return; }
+  if(!confirm('Permanently delete '+old.length+' project(s) deleted over 30 days ago? This cannot be undone.')) return;
+  var chain=Promise.resolve(), done=0;
+  old.forEach(function(pr){
+    chain=chain.then(function(){
+      return sb.functions.invoke('admin',{body:{action:'purgeProject',projectId:pr.id}}).then(function(){ done++; },function(){});
+    });
+  });
+  chain.then(function(){
+    toast(done+' old project(s) permanently deleted');
+    adminData=null; loadAdminData(true);
+    if(view.name==='admin') render();
+  });
+}
 function adminRemoveMember(pid,uid){
   if(!confirm('Remove this member from the project?'))return;
   adminFn('removeMembership',{projectId:pid,userId:uid},'Member removed');
@@ -2750,8 +2814,8 @@ function renderHdrMenu(){
   if(isAdmin) h+='<button onclick="goAdmin()">Admin</button>';
   if(sbReady&&sbUser){
     h+='<div class="mut" id="syncstat" style="padding:10px 12px 2px;font-size:.78rem">'+esc(syncStatusText())+'</div>'
-      +'<button onclick="openDiag()">Sync diagnostics</button>'
-      +'<button onclick="syncNow(true)">Sync now</button>'
+      +'<button onclick="openDiag()">Diagnostics</button>'
+      +'<button onclick="refreshFromServer(true)">Refresh now</button>'
       +'<button onclick="doSignOut()">Sign out</button>';
   }
   m.innerHTML=h;
@@ -2838,7 +2902,6 @@ function removeMember(uid2){
 
 /* ============ init ============ */
 initSupabase();
-loadSyncMeta();
 (function(){
   /* the Dashboard is the default landing view on every load (v4.3) */
   view={name:'dashboard'};delete view.id;curTab='overview';
