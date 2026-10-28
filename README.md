@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v5.2
+**Current version:** v5.2.1
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v5.2.1** — 3-dot submenus now close when you tap anywhere else, not just the 3 dots again.
 
 - **v5.2** — Project overview: Details card moved under Total time, Edit/Mark buttons moved into the gear menu. Admin: compact project rows with no member names underneath, Members dialog on each project menu to see/add/remove members. Admin: Cable options card to add/remove cable type and color dropdown items (needs the v5.2 cable_options migration + admin function update).
 

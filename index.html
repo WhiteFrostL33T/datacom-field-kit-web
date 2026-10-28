@@ -261,7 +261,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.2';
+var APP_VERSION='5.2.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -396,7 +396,7 @@ function goAdmin(){view={name:'admin'};render();}
 function openProject(id){view={name:'project',id:id};curTab='overview';render();}
 function setTab(t){curTab=t;render();}
 $('btnMore').addEventListener('click',function(e){e.stopPropagation();toggleHdrMenu();});
-document.addEventListener('click',function(){var m=$('hdrMenu');if(m)m.style.display='none';});
+document.addEventListener('click',function(){var m=$('hdrMenu');if(m)m.style.display='none';Array.prototype.forEach.call(document.querySelectorAll('.cardmenu .cmenu'),function(x){x.style.display='none';});});
 function toggleHdrMenu(){var m=$('hdrMenu');m.style.display=m.style.display==='none'?'block':'none';}
 function openImportForm(){
   if(view.name!=='projects')goProjects();
@@ -1852,6 +1852,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.2.1',items:['3-dot submenus now close when you tap anywhere else, not just the 3 dots again']},
  {v:'5.2',items:['Project overview: Details card moved under Total time, Edit/Mark buttons moved into the gear menu','Admin: compact project rows with no member names underneath, Members dialog on each project menu to see/add/remove members','Admin: Cable options card to add/remove cable type and color dropdown items (needs the v5.2 cable_options migration + admin function update)']},
  {v:'5.1',items:['Admin view redesigned: stat tiles on top, Crew / Users / Projects sections (3 columns on desktop)','Recycle bin now opens as a floating window from the In recycle bin tile — deleted projects moved out of the Projects list into the window']},
  {v:'5.0',items:['Your data now lives on the server: the app loads fresh from Supabase on launch and saves straight to the database — no copy kept on the phone, no more sync issues','Running timers live on the server too, so a timer follows you across devices','Admin: new Crew section in the Admin view — who is on the clock and crew hours this week','Activity log: Mine / Crew toggle, and rows show who last edited them','Deleted projects stay restorable for 30 days (Admin \u2192 Recycle bin)','Live updates: teammates\u2019 changes refresh automatically']},
