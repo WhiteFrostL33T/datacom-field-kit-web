@@ -194,6 +194,10 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
   .statgrid{grid-template-columns:repeat(4,1fr);}
   .secgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start;}
   .secgrid .card{margin:0;}
+  /* Admin desktop columns: each column is a vertical stack, so column
+     heights stay independent (a tall cable card must not push the middle
+     column's Users card below the fold). Mobile stacking is untouched. */
+  .secgrid .seccol{display:flex;flex-direction:column;gap:12px;min-width:0;}
   .deskHome2{display:grid;grid-template-columns:1fr;gap:12px;align-items:start;}
   .deskHome2 .card{margin:0;}
 }
@@ -261,7 +265,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.3';
+var APP_VERSION='5.3.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1905,6 +1909,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.3.1',items:['Admin desktop columns: cable options in the first column, Crew and Users stacked in the middle column, Projects on the right']},
  {v:'5.3',items:['Offline cache: the app opens from the last good server snapshot when the server cannot be reached, with an Offline badge','Failed saves no longer discard your edits \u2014 they stay on the device with a pending-changes indicator and retry when back online','Refreshes pause while changes are pending so a background refresh can never wipe unpushed edits']},
  {v:'5.2.1',items:['3-dot submenus now close when you tap anywhere else, not just the 3 dots again']},
  {v:'5.2',items:['Project overview: Details card moved under Total time, Edit/Mark buttons moved into the gear menu','Admin: compact project rows with no member names underneath, Members dialog on each project menu to see/add/remove members','Admin: Cable options card to add/remove cable type and color dropdown items (needs the v5.2 cable_options migration + admin function update)']},
@@ -2755,7 +2760,8 @@ function renderAdmin(){
     +'<button class="stat warn" onclick="openBinDialog()"><b>'+delProjs.length+'</b><span>In recycle bin \u203a</span></button>'
     +'</div>';
   h+='<div class="secgrid">';
-  h+=crewAdminHTML();
+  h+='<div class="seccol">'+cableOptionsHTML()+'</div>';
+  h+='<div class="seccol">'+crewAdminHTML();
   h+='<div class="card"><h3>Users ('+d.profiles.length+')</h3>';
   d.profiles.forEach(function(pr){
     var adm=d.admins.indexOf(pr.id)>=0;
@@ -2780,8 +2786,8 @@ function renderAdmin(){
         +'<button class="btn sec sml" onclick="adminCancelName()">Cancel</button></div>';
     }
   });
-  h+='</div>';
-  h+='<div class="card"><h3>Projects ('+actProjs.length+')</h3>';
+  h+='</div></div>';
+  h+='<div class="seccol"><div class="card"><h3>Projects ('+actProjs.length+')</h3>';
   actProjs.slice().sort(function(a,b){return String(b.created_at||'')<String(a.created_at||'')?-1:1;}).forEach(function(pr){
     var mem=d.members.filter(function(x){return x.project_id===pr.id;});
     h+='<div style="padding:5px 0;border-bottom:1px solid var(--line)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(pr.name)+'</b>'
@@ -2797,8 +2803,7 @@ function renderAdmin(){
       +'<div class="mut" style="font-size:.8rem">owner '+esc(labelOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</div>'
       +'</div>';
   });
-  h+='</div>';
-  h+=cableOptionsHTML();
+  h+='</div></div>';
   h+='</div>';
   h+='<div style="height:80px"></div>';
   h+='<button class="fab" onclick="openCreateUser()" aria-label="Create user">+</button>';
