@@ -261,7 +261,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.1';
+var APP_VERSION='5.2';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -309,6 +309,49 @@ function myProjectMinutes(pid){ return data.timeEntries.filter(function(e){retur
   .reduce(function(s,e){return s+entryMinutes(e);},0); }
 var CABLE_TYPES=['CAT6 Riser','CAT6 Plenum','Controlled Access Cable','2 Conductor Cable','4 Conductor Cable','6 Conductor Cable'];
 var CABLE_COLORS=['Blue','Black','White','Gray','Red','Green','Yellow','Orange','Purple','Brown'];
+var cableOpts=null, cableOptsLoaded=false, cableOptsMissing=false;
+function cableTypeList(){ return (cableOpts&&cableOpts.types)||CABLE_TYPES; }
+function cableColorList(){ return (cableOpts&&cableOpts.colors)||CABLE_COLORS; }
+function loadCableOptions(){
+  if(!sb||!sbUser) return;
+  if(cableOptsLoaded) return;
+  cableOptsLoaded=true;
+  sb.from('cable_options').select('kind,value').then(function(r){
+    if(r.error){ cableOptsMissing=true; cableOpts=null; }
+    else{
+      var t=[], c=[];
+      (r.data||[]).forEach(function(row){ if(row.kind==='type') t.push(row.value); else if(row.kind==='color') c.push(row.value); });
+      cableOpts={ types:t.length?t:null, colors:c.length?c:null };
+    }
+    if(view.name==='admin') render();
+  },function(){ cableOptsMissing=true; cableOpts=null; if(view.name==='admin') render(); });
+}
+function saveCableList(kind,list,msg){
+  sb.from('cable_options').delete().eq('kind',kind).then(function(){
+    var rows=list.map(function(x){return {kind:kind,value:x};});
+    if(!rows.length){ cableOptsLoaded=false; loadCableOptions(); toast(msg); return; }
+    sb.from('cable_options').insert(rows).then(function(r){
+      if(r.error){ toast('Could not save cable options: '+r.error.message); return; }
+      cableOptsLoaded=false; loadCableOptions(); toast(msg);
+    },function(){ toast('Could not save cable options: network error'); });
+  },function(){ toast('Could not save cable options: network error'); });
+}
+function addCableOption(kind){
+  if(!sb){ toast('Connect to the server first'); return; }
+  var v=(val('co_new_'+kind)||'').trim(); if(!v){ toast('Type a new option first'); return; }
+  var cur=kind==='type'?cableTypeList():cableColorList();
+  if(cur.indexOf(v)>=0){ toast('Already in the list'); return; }
+  saveCableList(kind,cur.concat([v]),'Option added');
+}
+function removeCableOption(kind,idx){
+  if(!sb){ toast('Connect to the server first'); return; }
+  var cur=kind==='type'?cableTypeList():cableColorList();
+  if(cur.length<=1){ toast('Keep at least one option'); return; }
+  var value=cur[idx];
+  if(!confirm('Remove "'+value+'" from the list? Past pulls keep it.')) return;
+  var next=cur.filter(function(x,i){return i!==idx;});
+  saveCableList(kind,next,'Option removed');
+}
 function dayLabel(key){ var y=+key.slice(0,4),m=+key.slice(5,7)-1,d=+key.slice(8,10);
   var dt=new Date(y,m,d);
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+', '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m]+' '+d; }
@@ -917,6 +960,14 @@ function overviewHTML(p){
     +stat('Materials',data.materials.filter(function(m){return m.projectId===p.id;}).length)
     +stat('Entries',data.timeEntries.filter(function(e){return e.projectId===p.id;}).length)
     +'</div></div>';
+  h+='<div class="card"><div class="cardhd"><h3>Details</h3><span class="cardmenu"><button class="gearbtn" aria-label="Details actions" onclick="event.stopPropagation();toggleCardMenu(\'proj\')">'+GEAR_SVG+'</button><div class="cmenu" id="cmenu-proj" style="display:none"><button onclick="event.stopPropagation();toggleCardMenu(\'proj\');editProjectForm()">Edit details</button><button onclick="event.stopPropagation();toggleCardMenu(\'proj\');toggleProjStatus()">Mark '+(p.status==='done'?'active':'closed')+'</button><button onclick="event.stopPropagation();toggleCardMenu(\'proj\');openModuleDialog()">Modules</button></div></span></div>'
+    +'<div class="kv"><span class="mut">Customer</span><b>'+esc(p.customer||'—')+'</b></div>'
+    +'<div class="kv"><span class="mut">Site</span><b>'+esc(p.site||'—')+'</b></div>'
+    +'<div class="kv"><span class="mut">ConnectWise ticket</span><b>'+esc(p.ticket||'—')+'</b></div>'
+    +'<div class="kv"><span class="mut">Status</span><b>'+esc(p.status||'active')+'</b></div>'
+    +(p.notes?'<div class="kv"><span class="mut">Notes</span><b>'+esc(p.notes)+'</b></div>':'')
+    
+    +'<div id="editProj"></div></div>';
   var tileIds=mods.slice();
   if(tileIds.indexOf('finallog')<0)tileIds.splice(Math.min(3,tileIds.length),0,'finallog');
   h+='<div class="modgrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
@@ -936,15 +987,7 @@ function overviewHTML(p){
   if(!ev.length) h+='<p class="mut">Nothing logged yet on this project.</p>';
   ev.forEach(function(it){ h+=feedItem(it); });
   h+='</div>';
-  h+='<div class="card"><div class="cardhd"><h3>Details</h3><button class="gearbtn" aria-label="Module settings" onclick="openModuleDialog()">'+GEAR_SVG+'</button></div>'
-    +'<div class="kv"><span class="mut">Customer</span><b>'+esc(p.customer||'—')+'</b></div>'
-    +'<div class="kv"><span class="mut">Site</span><b>'+esc(p.site||'—')+'</b></div>'
-    +'<div class="kv"><span class="mut">ConnectWise ticket</span><b>'+esc(p.ticket||'—')+'</b></div>'
-    +'<div class="kv"><span class="mut">Status</span><b>'+esc(p.status||'active')+'</b></div>'
-    +(p.notes?'<div class="kv"><span class="mut">Notes</span><b>'+esc(p.notes)+'</b></div>':'')
-    +'<div class="row" style="margin-top:10px"><button class="btn sec" onclick="editProjectForm()">Edit details</button>'
-    +'<button class="btn sec" onclick="toggleProjStatus()">Mark '+(p.status==='done'?'active':'closed')+'</button></div>'
-    +'<div id="editProj"></div></div>';
+  
   h+=techCardHTML(p);
   if(data.timer&&data.timer.projectId===p.id)
     h+='<button class="btn" disabled style="background:var(--chip);color:var(--muted)">Timer running on this project</button>';
@@ -1161,9 +1204,9 @@ function cableHTML(p){
   var boxNames=Object.keys(boxes);
   var h=modHero(p,'Cable',projectCableFt(p.id)+' ft')+'<div class="card"><h3>Add cable pull</h3>'
     +'<div class="row"><div><label>Cable type</label><select id="cp_run">'
-    +CABLE_TYPES.map(function(t){return '<option>'+esc(t)+'</option>';}).join('')+'</select></div>'
+    +cableTypeList().map(function(t){return '<option>'+esc(t)+'</option>';}).join('')+'</select></div>'
     +'<div><label>Cable Color</label><select id="cp_box">'
-    +CABLE_COLORS.map(function(c){return '<option>'+esc(c)+'</option>';}).join('')+'</select></div></div>'
+    +cableColorList().map(function(c){return '<option>'+esc(c)+'</option>';}).join('')+'</select></div></div>'
     +'<label>Box size (ft)</label><input id="cp_size" type="number" inputmode="decimal" value="1000">'
     +'<label>Markings on the box</label><div class="seg">'
     +'<button type="button" id="pm_range" class="'+(pullMode==='range'?'act':'')+'" onclick="setPullMode(\'range\')">Previous + newest</button>'
@@ -1574,7 +1617,7 @@ function connectwiseNotes(p){
   L.push('----------------------------------------');
   var byType={};
   data.pulls.filter(function(x){return x.projectId===p.id;}).forEach(function(x){
-    var t=x.run||'Unspecified'; if(x.box&&CABLE_COLORS.indexOf(x.box)>=0) t+=' ('+x.box+')';
+    var t=x.run||'Unspecified'; if(x.box&&cableColorList().indexOf(x.box)>=0) t+=' ('+x.box+')';
     byType[t]=(byType[t]||0)+(Number(x.used)||0);});
   var types=Object.keys(byType);
   if(!types.length)L.push('No cable pulls logged.');
@@ -1809,6 +1852,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.2',items:['Project overview: Details card moved under Total time, Edit/Mark buttons moved into the gear menu','Admin: compact project rows with no member names underneath, Members dialog on each project menu to see/add/remove members','Admin: Cable options card to add/remove cable type and color dropdown items (needs the v5.2 cable_options migration + admin function update)']},
  {v:'5.1',items:['Admin view redesigned: stat tiles on top, Crew / Users / Projects sections (3 columns on desktop)','Recycle bin now opens as a floating window from the In recycle bin tile — deleted projects moved out of the Projects list into the window']},
  {v:'5.0',items:['Your data now lives on the server: the app loads fresh from Supabase on launch and saves straight to the database — no copy kept on the phone, no more sync issues','Running timers live on the server too, so a timer follows you across devices','Admin: new Crew section in the Admin view — who is on the clock and crew hours this week','Activity log: Mine / Crew toggle, and rows show who last edited them','Deleted projects stay restorable for 30 days (Admin \u2192 Recycle bin)','Live updates: teammates\u2019 changes refresh automatically']},
  {v:'4.8',items:['Activity log now groups entries by day, each day headed with its totals (time, cable feet, materials)','Projects: jobs you touched in the last 7 days sit in a This week band above the full list','New Daily timesheet: the whole day across all projects on one screen - edit entries in place, a timeline bar on top, amber flags for gaps and overlaps']},
@@ -2626,6 +2670,7 @@ function adminFn(action,payload,doneMsg){
 function renderAdmin(){
   if(!isAdmin){ $('app').innerHTML='<div class="card"><p class="mut">Admins only.</p></div>'; return; }
   loadAdminData();
+  if(!cableOptsLoaded&&sb){ loadCableOptions(); }
   if(!crewTimersLoaded&&sb){ loadCrewTimers().then(function(){ if(view.name==='admin'&&!uiBusy()) render(); }); }
   if(!adminData||adminData.loading){ $('app').innerHTML='<div class="card"><p class="mut">Loading admin data\u2026</p></div>'; return; }
   if(adminData.error){
@@ -2676,29 +2721,71 @@ function renderAdmin(){
   h+='<div class="card"><h3>Projects ('+actProjs.length+')</h3>';
   actProjs.slice().sort(function(a,b){return String(b.created_at||'')<String(a.created_at||'')?-1:1;}).forEach(function(pr){
     var mem=d.members.filter(function(x){return x.project_id===pr.id;});
-    h+='<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(pr.name)+'</b>'
+    h+='<div style="padding:5px 0;border-bottom:1px solid var(--line)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(pr.name)+'</b>'
       
-      +'<span class="mut">owner '+esc(labelOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</span>'
+      
       +'<span class="cardmenu" style="margin-left:auto"><button class="iconbtn" aria-label="Project actions" onclick="event.stopPropagation();toggleAdminMenu(\'p-'+pr.id+'\')">&#8942;</button>'
       +'<span class="cmenu" id="amenu-p-'+pr.id+'" style="display:none">'
       
+      +'<button onclick="openMembersDialog(\''+pr.id+'\')">Members…</button>'
       +'<button class="danger" onclick="adminPurgeConfirm(\''+pr.id+'\')">Delete permanently</button>'
       +'</span></span>'
       +'</div>'
-      +mem.map(function(m){
-        return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0 0 14px"><span class="mut" style="flex:1">'+esc(labelOf(m.user_id))+'</span>'
-          +'<span class="cardmenu"><button class="iconbtn" aria-label="Member actions" onclick="event.stopPropagation();toggleAdminMenu(\'m-'+pr.id+'-'+m.user_id+'\')">&#8942;</button>'
-          +'<span class="cmenu" id="amenu-m-'+pr.id+'-'+m.user_id+'" style="display:none">'
-          +'<button class="danger" onclick="adminRemoveMember(\''+pr.id+'\',\''+m.user_id+'\')">Remove from project</button>'
-          +'</span></span></div>';}).join('')
+      +'<div class="mut" style="font-size:.8rem">owner '+esc(labelOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</div>'
       +'</div>';
   });
   h+='</div>';
+  h+=cableOptionsHTML();
   h+='</div>';
   h+='<div style="height:80px"></div>';
   h+='<button class="fab" onclick="openCreateUser()" aria-label="Create user">+</button>';
   $('app').innerHTML=h;
 }
+function cableOptionsHTML(){
+  var h='<div class="card"><h3>Cable options</h3>';
+  if(cableOptsMissing) h+='<p class="mut">The cable_options table is not set up yet — run the v5.2 migration SQL in Supabase, then these lists become editable. Showing the built-in lists for now.</p>';
+  else h+='<p class="mut">What shows in the cable pull dropdowns. Removing an option never changes past pulls.</p>';
+  var groups=[['type','Types',cableTypeList()],['color','Colors',cableColorList()]];
+  groups.forEach(function(g){
+    h+='<div class="seclbl">'+g[1]+'</div>';
+    g[2].forEach(function(v,i){
+      h+='<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)"><span style="flex:1">'+esc(v)+'</span>';
+      if(!cableOptsMissing) h+='<span class="cardmenu"><button class="iconbtn" aria-label="Option actions" onclick="event.stopPropagation();toggleAdminMenu(\''+g[0]+'-'+i+'\')">&#8942;</button>'
+        +'<span class="cmenu" id="amenu-'+g[0]+'-'+i+'" style="display:none">'
+        +'<button class="danger" onclick="removeCableOption(\''+g[0]+'\','+i+')">Remove</button></span></span>';
+      h+='</div>';
+    });
+    if(!cableOptsMissing) h+='<div style="display:flex;gap:8px;margin-top:10px">'
+      +'<input id="co_new_'+g[0]+'" placeholder="New '+g[1].toLowerCase().slice(0,-1)+'…" style="flex:1;margin:0">'
+      +'<button class="btn" style="flex:0 0 auto;width:auto;min-height:40px;padding:8px 16px" onclick="addCableOption(\''+g[0]+'\')">Add</button></div>';
+  });
+  return h+'</div>';
+}
+function openMembersDialog(pid){
+  closeMembersDialog();
+  var d=adminData||{projects:[],members:[],profiles:[]};
+  var pr=d.projects.filter(function(x){return x.id===pid;})[0]; if(!pr) return;
+  var memIds=d.members.filter(function(m){return m.project_id===pid;}).map(function(m){return m.user_id;});
+  var labelOf=function(id){ var x=d.profiles.filter(function(y){return y.id===id;})[0]; return x?profLabel(x):String(id).slice(0,8)+'…'; };
+  var rows=memIds.length?memIds.map(function(uid){
+    return '<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0"><b>'+esc(labelOf(uid))+'</b></span>'
+      +'<button class="btn sec" style="flex:none;width:auto;min-height:36px;padding:8px 14px;" onclick="closeMembersDialog();adminRemoveMember(\''+pid+'\',\''+uid+'\')">Remove</button></div>';
+  }).join(''):'<p class="mut">Nobody on this project yet.</p>';
+  var cands=d.profiles.filter(function(p){return memIds.indexOf(p.id)<0;});
+  var addRow=cands.length?'<p class="mut" style="margin:12px 0 8px">Add someone already on the team:</p>'
+    +'<div style="display:flex;gap:8px"><select id="md_add" style="flex:1;margin:0">'
+    +cands.map(function(p){return '<option value="'+p.id+'">'+esc(profLabel(p))+'</option>';}).join('')
+    +'</select><button class="btn" style="flex:0 0 auto;width:auto;min-height:40px;padding:8px 16px" onclick="closeMembersDialog();adminAddMember(\''+pid+'\',val(\'md_add\'))">Add</button></div>'
+    :'<p class="mut" style="margin:12px 0 8px">Everyone is already on this project.</p>';
+  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='memDlg';
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Members</h3></div>'
+    +'<p class="mut" style="margin:0 0 8px">'+esc(pr.name)+'</p>'+rows+addRow
+    +'<button class="btn" style="width:100%;margin-top:12px" onclick="closeMembersDialog()">Done</button></div>';
+  ov.addEventListener('click',function(e){ if(e.target===ov) closeMembersDialog(); });
+  document.body.appendChild(ov);
+}
+function closeMembersDialog(){ var o=document.getElementById('memDlg'); if(o) o.remove(); }
+function adminAddMember(pid,uid){ if(!uid) return; adminFn('addMembership',{projectId:pid,userId:uid},'Member added'); }
 function openBinDialog(){
   closeBinDialog();
   var d=adminData||{projects:[]};
