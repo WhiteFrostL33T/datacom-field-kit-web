@@ -285,7 +285,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.4';
+var APP_VERSION='5.5';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -692,11 +692,48 @@ function fmtClock(d){ return d.toLocaleTimeString([],{hour:'numeric',minute:'2-d
 function stopTimer(){
   if(!data.timer)return;
   var r=snapRange(new Date(data.timer.startISO),new Date());
-  var mins=Math.round((r[1]-r[0])/60000);
-  data.timeEntries.push({id:uid(),projectId:data.timer.projectId,kind:data.timer.kind,
-    startISO:toLocalInput(r[0]),endISO:toLocalInput(r[1]),notes:'',source:'timer',userId:(sbUser?sbUser.id:'')});
+  var entry={id:uid(),projectId:data.timer.projectId,kind:data.timer.kind,
+    startISO:toLocalInput(r[0]),endISO:toLocalInput(r[1]),notes:'',source:'timer',userId:(sbUser?sbUser.id:'')};
+  data.timeEntries.push(entry);
   data.timer=null;save();pushTimerRow();render();
-  toast('Time entry saved ('+fmtHM(mins)+', '+fmtClock(r[0])+'\u2013'+fmtClock(r[1])+')');}
+  openStopDialog(entry.id);}
+var stopDlgId=null;
+function openStopDialog(id){
+  var e=data.timeEntries.filter(function(x){return x.id===id;})[0]; if(!e)return;
+  var p=projById(e.projectId); stopDlgId=id;
+  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='stopDlg';
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Time entry</h3><button class="dlg-x" aria-label="Close" onclick="closeStopDialog()">\u00d7</button></div>'
+    +'<p class="mut" style="margin:2px 0 12px">'+esc(p?p.name:'?')+' \u00b7 '+esc(e.kind)+' \u00b7 '+fmtClock(new Date(e.startISO))+'\u2013'+fmtClock(new Date(e.endISO))+' ('+fmtHM(entryMinutes(e))+')</p>'
+    +'<label>Notes</label><textarea id="sd_notes" rows="3" placeholder="What did you work on?">'+esc(e.notes||'')+'</textarea>'
+    +'<div class="row" style="margin-top:12px"><div><label>Start</label><input id="sd_start" type="time" value="'+e.startISO.slice(11,16)+'"></div><div><label>End</label><input id="sd_end" type="time" value="'+e.endISO.slice(11,16)+'"></div></div>'
+    +'<div style="margin-top:12px"><label>Lunch deduction (hours)</label><div class="seg" id="sd_lunch_seg"><button class="act" data-min="0" onclick="stopLunchPick(this)">0</button><button data-min="15" onclick="stopLunchPick(this)">0.25</button><button data-min="30" onclick="stopLunchPick(this)">0.5</button><button data-min="45" onclick="stopLunchPick(this)">0.75</button><button data-min="60" onclick="stopLunchPick(this)">1</button></div></div>'
+    +'<button class="btn" style="width:100%;margin-top:16px" onclick="stopDialogSave()">Save</button>'
+    +'<button class="btn sec" style="width:100%;margin-top:8px" onclick="closeStopDialog()">Keep as-is</button></div>';
+  ov.addEventListener('click',function(ev){ if(ev.target===ov) closeStopDialog(); });
+  document.body.appendChild(ov);
+}
+function stopLunchPick(btn){
+  var seg=document.getElementById('sd_lunch_seg'); if(!seg) return;
+  seg.querySelectorAll('button').forEach(function(b){ b.classList.remove('act'); });
+  btn.classList.add('act');
+}
+function stopDialogSave(){
+  var e=stopDlgId?data.timeEntries.filter(function(x){return x.id===stopDlgId;})[0]:null; if(!e)return;
+  var s=val('sd_start'),en=val('sd_end');
+  if(!s||!en||en<=s){toast('End must be after start');return;}
+  var day=e.startISO.slice(0,10);
+  var gross=(new Date(day+'T'+en).getTime()-new Date(day+'T'+s).getTime())/60000;
+  var seg=document.querySelector('#sd_lunch_seg .act');
+  var lunch=Math.max(0,parseInt(seg?seg.getAttribute('data-min'):'0',10)||0);
+  if(lunch>=gross){toast('Lunch must be shorter than the entry');return;}
+  e.startISO=day+'T'+s; e.endISO=day+'T'+en; e.notes=val('sd_notes'); e.lunchMin=lunch;
+  save(); closeStopDialog(); render();
+}
+function closeStopDialog(){
+  var o=document.getElementById('stopDlg'); if(o) o.remove();
+  var e=stopDlgId?data.timeEntries.filter(function(x){return x.id===stopDlgId;})[0]:null; stopDlgId=null;
+  if(e) toast('Time entry saved ('+fmtHM(entryMinutes(e))+', '+fmtClock(new Date(e.startISO))+'\u2013'+fmtClock(new Date(e.endISO))+')');
+}
 </script>
 
 <script>
@@ -1929,6 +1966,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.5',items:['Stopping a timer now opens a dialog: enter notes, correct the start/end times, and pick a lunch deduction in 15-minute steps (0, 0.25, 0.5, 0.75, 1 hours)','The entry is saved first, then edited \u2014 Keep as-is leaves it exactly as stopped','Same guardrails as the timesheet edit: end must be after start, lunch must be shorter than the entry']},
  {v:'5.4',items:['One teal accent across the app: buttons, week chart, clock ring, and the active tab','Sync status is now a pill \u2014 teal when synced, amber when offline, cached, or changes are pending','Loading screens use skeleton placeholders shaped like the dashboard instead of a text line','Dialogs get a blurred backdrop and a close button in the corner','Subtle 150ms transitions on dialogs, menus, buttons, and the toast']},
  {v:'5.3.1',items:['Admin desktop columns: cable options in the first column, Crew and Users stacked in the middle column, Projects on the right']},
  {v:'5.3',items:['Offline cache: the app opens from the last good server snapshot when the server cannot be reached, with an Offline badge','Failed saves no longer discard your edits \u2014 they stay on the device with a pending-changes indicator and retry when back online','Refreshes pause while changes are pending so a background refresh can never wipe unpushed edits']},

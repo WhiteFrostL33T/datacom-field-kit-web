@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v5.4
+**Current version:** v5.5
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v5.5** — Stop-timer dialog: notes, time corrections, and lunch deduction in 15-minute steps right when you stop a timer
 
 - **v5.4** — UI polish: unified teal accent, sync status pill with amber warn state, skeleton loading screens, dialog close buttons + blurred backdrops, 150ms transitions
 
