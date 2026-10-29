@@ -201,6 +201,26 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
   .deskHome2{display:grid;grid-template-columns:1fr;gap:12px;align-items:start;}
   .deskHome2 .card{margin:0;}
 }
+  /* v5.4 UI polish: one accent, pill status, skeletons, dialog + motion. */
+  :root{ --accent:#2dd4bf; }
+  .btab.act{color:#0d1020;background:var(--accent);border-color:var(--accent);}
+  .card h3{font-size:1.05rem;font-weight:700;letter-spacing:.2px;}
+  .card{padding:16px;}
+  #syncstat{display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(45,212,191,.14);border:1px solid rgba(45,212,191,.35);color:#7ce7b0;font-size:.75rem;line-height:1.4;}
+  #syncstat:empty{display:none;}
+  #syncstat.warn{background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.35);color:#fbbf24;}
+  .dlg-ov{backdrop-filter:blur(6px);background:rgba(0,0,0,.6);}
+  .dlg-x{background:none;border:none;color:var(--muted);font-size:1.5rem;line-height:1;padding:2px 6px;cursor:pointer;}
+  .dlg{animation:dlgIn .15s ease-out;}
+  @keyframes dlgIn{from{opacity:0;transform:scale(.97) translateY(6px);}to{opacity:1;transform:none;}}
+  .cmenu{animation:menuIn .15s ease-out;}
+  @keyframes menuIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+  .btn{transition:transform .1s ease,filter .15s ease;}
+  .btn:active{transform:scale(.98);}
+  #toast{transition:opacity .2s ease;}
+  .skel{background:#232842;border-radius:10px;position:relative;overflow:hidden;}
+  .skel::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);transform:translateX(-100%);animation:shimmer 1.4s infinite;}
+  @keyframes shimmer{to{transform:translateX(100%);}}
 </style>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js");}</script>
 </head>
@@ -265,7 +285,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.3.1';
+var APP_VERSION='5.4';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1063,7 +1083,7 @@ function openModuleDialog(){
       +(on?' checked':'')+(locked?' disabled':'')+' onchange="toggleModule(\''+m[0]+'\',this.checked)"><i></i></span></div>';}).join('');
   var ov=document.createElement('div');
   ov.className='dlg-ov';ov.id='modDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Modules</h3></div>'
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Modules</h3><button class="dlg-x" aria-label="Close" onclick="closeModuleDialog()">\u00d7</button></div>'
     +'<p class="mut" style="margin-top:0">Sections for this project. Turning a module off hides its tab — its data is kept.</p>'
     +rows
     +'<button class="btn pri" style="width:100%;margin-top:12px" onclick="closeModuleDialog()">Done</button></div>';
@@ -1909,6 +1929,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.4',items:['One teal accent across the app: buttons, week chart, clock ring, and the active tab','Sync status is now a pill \u2014 teal when synced, amber when offline, cached, or changes are pending','Loading screens use skeleton placeholders shaped like the dashboard instead of a text line','Dialogs get a blurred backdrop and a close button in the corner','Subtle 150ms transitions on dialogs, menus, buttons, and the toast']},
  {v:'5.3.1',items:['Admin desktop columns: cable options in the first column, Crew and Users stacked in the middle column, Projects on the right']},
  {v:'5.3',items:['Offline cache: the app opens from the last good server snapshot when the server cannot be reached, with an Offline badge','Failed saves no longer discard your edits \u2014 they stay on the device with a pending-changes indicator and retry when back online','Refreshes pause while changes are pending so a background refresh can never wipe unpushed edits']},
  {v:'5.2.1',items:['3-dot submenus now close when you tap anywhere else, not just the 3 dots again']},
@@ -2060,12 +2081,18 @@ function onSignedIn(session,keepView){
   checkAdmin();
   if(!keepView){ view={name:'dashboard'}; curTab='overview'; }
   else if(view.name==='login'){ view={name:'dashboard'}; }
-  $('app').innerHTML='<div class="card" style="max-width:420px;margin:48px auto;text-align:center"><p class="mut">Loading your projects…</p></div>';
+  $('app').innerHTML=loadingHTML();
   initialLoad();
   subscribeRealtime();
 }
+function loadingHTML(){
+  return '<div style="margin:2px 0 16px"><div class="skel" style="height:14px;width:120px"></div><div class="skel" style="height:30px;width:230px;margin-top:8px"></div></div>'
+    +'<div class="card"><div class="skel" style="height:14px;width:150px"></div><div class="skel" style="height:46px;width:170px;margin-top:12px"></div><div class="skel" style="height:14px;width:190px;margin-top:10px"></div></div>'
+    +'<div class="card"><div class="skel" style="height:20px;width:150px"></div><div style="display:flex;gap:10px;align-items:flex-end;margin-top:14px"><div class="skel" style="height:30px;flex:1"></div><div class="skel" style="height:44px;flex:1"></div><div class="skel" style="height:70px;flex:1"></div><div class="skel" style="height:38px;flex:1"></div><div class="skel" style="height:52px;flex:1"></div></div></div>'
+    +'<div class="card"><div class="skel" style="height:20px;width:140px"></div><div class="skel" style="height:14px;width:92%;margin-top:12px"></div><div class="skel" style="height:14px;width:68%;margin-top:8px"></div></div>';
+}
 function initialLoad(){
-  $('app').innerHTML='<div class="card" style="max-width:420px;margin:48px auto;text-align:center"><p class="mut">Loading your projects…</p></div>';
+  $('app').innerHTML=loadingHTML();
   setSyncStatus('refreshing');
   migrateLocalOnce().then(function(){ return fetchAllFromServer(); }).then(function(){
     var jobs=[loadPrefs(),loadOwnTimer()];
@@ -2562,7 +2589,7 @@ function fetchAuthorLabels(){
 function setSyncStatus(s){
   syncStatus=s; syncStatusAt=Date.now();
   var el=document.getElementById('syncstat');
-  if(el) el.textContent=syncStatusText();
+  if(el){ el.textContent=syncStatusText(); el.classList.toggle('warn', s==='pending'||s==='offline'||s==='cache'); }
 }
 var syncErrMsg='';
 var syncNote='';
@@ -2661,7 +2688,7 @@ function openDiag(){
   closeDiag();
   var ov=document.createElement('div');
   ov.className='dlg-ov'; ov.id='diagDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Diagnostics</h3></div>'
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Diagnostics</h3><button class="dlg-x" aria-label="Close" onclick="closeDiag()">\u00d7</button></div>'
     +'<div id="diag_body"><p class="mut">Checking…</p></div>'
     +'<button class="btn sec" style="width:100%;margin-top:12px" onclick="closeDiag()">Close</button></div>';
   ov.addEventListener('click',function(e){ if(e.target===ov) closeDiag(); });
@@ -2846,7 +2873,7 @@ function openMembersDialog(pid){
     +'</select><button class="btn" style="flex:0 0 auto;width:auto;min-height:40px;padding:8px 16px" onclick="closeMembersDialog();adminAddMember(\''+pid+'\',val(\'md_add\'))">Add</button></div>'
     :'<p class="mut" style="margin:12px 0 8px">Everyone is already on this project.</p>';
   var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='memDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Members</h3></div>'
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Members</h3><button class="dlg-x" aria-label="Close" onclick="closeMembersDialog()">\u00d7</button></div>'
     +'<p class="mut" style="margin:0 0 8px">'+esc(pr.name)+'</p>'+rows+addRow
     +'<button class="btn" style="width:100%;margin-top:12px" onclick="closeMembersDialog()">Done</button></div>';
   ov.addEventListener('click',function(e){ if(e.target===ov) closeMembersDialog(); });
@@ -2869,7 +2896,7 @@ function openBinDialog(){
   }).join(''):'<p class="mut">Nothing in the recycle bin.</p>';
   var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='binDlg';
   ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Recycle bin</h3>'
-    +'<span class="tbadge" style="background:#a33333">'+del.length+' deleted</span></div>'
+    +'<span class="tbadge" style="background:#a33333">'+del.length+' deleted</span><button class="dlg-x" aria-label="Close" onclick="closeBinDialog()">\u00d7</button></div>'
     +rows
     +'<p class="mut" style="margin:10px 0">Deleted projects stay restorable for 30 days. Restore brings back the project and everything deleted with it.</p>'
     +(del.length?'<button class="btn sec" style="width:100%" onclick="binPurge()">Delete permanently everything deleted 30+ days ago</button>':'')
@@ -2887,7 +2914,7 @@ function toggleAdminMenu(key){
 function openCreateUser(){
   closeCreateUser();
   var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='cuDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Create user</h3></div>'
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Create user</h3><button class="dlg-x" aria-label="Close" onclick="closeCreateUser()">\u00d7</button></div>'
     +'<label>Email</label><input id="ad_email" type="email" placeholder="tech@example.com">'
     +'<label>Temporary password</label><input id="ad_pass" type="text" placeholder="8+ characters \u2014 share it with them">'
     +'<p class="mut">Runs through the admin Edge Function. The new user can sign in right away.</p>'
@@ -2904,7 +2931,7 @@ function adminPurgeConfirm(pid){
   var ownerLbl=ownerPr?profLabel(ownerPr):String(pr.owner_id||'').slice(0,8)+'\u2026';
   closePurge();
   var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='purgeDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Delete permanently?</h3></div>'
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Delete permanently?</h3><button class="dlg-x" aria-label="Close" onclick="closePurge()">\u00d7</button></div>'
     +'<p style="margin:2px 0"><b>'+esc(pr.name)+'</b></p>'
     +'<p class="mut" style="margin:2px 0">Owner '+esc(ownerLbl)+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</p>'
     +'<div id="purgeCounts"><p class="mut">Counting records\u2026</p></div>'
@@ -3026,7 +3053,7 @@ function openShareDialog(){
   var ov=document.createElement('div');
   ov.className='dlg-ov'; ov.id='shareDlg';
   shareSel={};
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Share project</h3></div>'
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Share project</h3><button class="dlg-x" aria-label="Close" onclick="closeShareDialog()">\u00d7</button></div>'
     +'<p class="mut" style="margin-top:0">Invite people to collaborate on &ldquo;'+esc(p.name)+'&rdquo;.</p>'
     +'<div class="seclbl">Members</div><div id="share_list"><p class="mut">Loading…</p></div>'
     +'<div class="seclbl" style="margin-top:12px">Invite — tap to select</div><div id="share_invite"><p class="mut">Loading…</p></div>'
