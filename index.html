@@ -285,7 +285,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.5';
+var APP_VERSION='5.5.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -399,13 +399,26 @@ function loadCableOptions(){
     if(view.name==='admin') render();
   },function(){ cableOptsMissing=true; cableOpts=null; if(view.name==='admin') render(); });
 }
+function applyCableList(kind,list,hadFullLoad){
+  // The server just confirmed this exact list: adopt it immediately instead
+  // of refetching. The old refetch left a stale window (the toast fired
+  // before it landed) and only re-rendered the Admin view, so project
+  // dropdowns kept the previous list until a later re-render.
+  if(!cableOpts) cableOpts={types:null,colors:null};
+  if(kind==='type') cableOpts.types=list.length?list.slice():null;
+  else cableOpts.colors=list.length?list.slice():null;
+  cableOptsMissing=false;
+  if(hadFullLoad){ cableOptsLoaded=true; render(); }
+  else { cableOptsLoaded=false; loadCableOptions(); }
+}
 function saveCableList(kind,list,msg){
+  var hadFullLoad=cableOptsLoaded&&!!cableOpts;
   sb.from('cable_options').delete().eq('kind',kind).then(function(){
     var rows=list.map(function(x){return {kind:kind,value:x};});
-    if(!rows.length){ cableOptsLoaded=false; loadCableOptions(); toast(msg); return; }
+    if(!rows.length){ applyCableList(kind,[],hadFullLoad); toast(msg); return; }
     sb.from('cable_options').insert(rows).then(function(r){
       if(r.error){ toast('Could not save cable options: '+r.error.message); return; }
-      cableOptsLoaded=false; loadCableOptions(); toast(msg);
+      applyCableList(kind,list,hadFullLoad); toast(msg);
     },function(){ toast('Could not save cable options: network error'); });
   },function(){ toast('Could not save cable options: network error'); });
 }
@@ -1966,6 +1979,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.5.1',items:['Cable options fix: an Admin save now updates the project dropdowns immediately \u2014 the old refetch left a stale window and only re-rendered the Admin view','Failed saves still leave the lists untouched with an error toast']},
  {v:'5.5',items:['Stopping a timer now opens a dialog: enter notes, correct the start/end times, and pick a lunch deduction in 15-minute steps (0, 0.25, 0.5, 0.75, 1 hours)','The entry is saved first, then edited \u2014 Keep as-is leaves it exactly as stopped','Same guardrails as the timesheet edit: end must be after start, lunch must be shorter than the entry']},
  {v:'5.4',items:['One teal accent across the app: buttons, week chart, clock ring, and the active tab','Sync status is now a pill \u2014 teal when synced, amber when offline, cached, or changes are pending','Loading screens use skeleton placeholders shaped like the dashboard instead of a text line','Dialogs get a blurred backdrop and a close button in the corner','Subtle 150ms transitions on dialogs, menus, buttons, and the toast']},
  {v:'5.3.1',items:['Admin desktop columns: cable options in the first column, Crew and Users stacked in the middle column, Projects on the right']},
