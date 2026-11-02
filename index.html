@@ -983,7 +983,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.6';
+var APP_VERSION='5.7';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1170,7 +1170,7 @@ function fallbackCopy(text){var ta=document.createElement('textarea');ta.value=t
 /* ============ routing ============ */
 var view={name:'dashboard'};
 var curTab='overview';
-function goProjects(){projTab='active';view={name:'projects'};render();}
+function goProjects(){projTab='scheduled';view={name:'projects'};render();}
 function goTimer(){view={name:'timer'};render();}
 function goActivity(){view={name:'activity'};render();}
 function goDashboard(){view={name:'dashboard'};render();}
@@ -2101,7 +2101,7 @@ function closeStopDialog(){
 
 <script>
 /* ============ PROJECTS LIST ============ */
-var projTab='active';
+var projTab='scheduled';
 var deskQuery='';
 function setProjTab(t){projTab=t;renderProjects();}
 function greetParts(){
@@ -2208,12 +2208,70 @@ function dashboardHTML(){
   h+='<div class="deskonly deskHome2">'+chartHD+actH+'</div>';
   return h;
 }
+function todayStr(off){ var d=new Date(); if(off)d.setDate(d.getDate()+off); var m=('0'+(d.getMonth()+1)).slice(-2),day=('0'+d.getDate()).slice(-2); return d.getFullYear()+'-'+m+'-'+day; }
+function schedEnd(p){ return (p&&p.schedEnd)||(p&&p.schedStart)||''; }
+function fmtSchedDate(s){ var a=(s||'').split('-'); if(a.length!==3)return s||''; var d=new Date(+a[0],+a[1]-1,+a[2]); return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+function schedState(p){ var s=(p&&p.schedStart)||''; if(!s)return ''; var t=todayStr(0),e=schedEnd(p); if(e<t)return 'overdue'; if(s>t)return 'future'; return 'today'; }
+function schedLabel(p){ var s=(p&&p.schedStart)||''; if(!s)return 'Not scheduled'; var e=schedEnd(p); return e>s?fmtSchedDate(s)+' \u2013 '+fmtSchedDate(e):fmtSchedDate(s); }
+function schedPill(p){
+  var st=schedState(p); if(!st)return '';
+  var s=p.schedStart,e=schedEnd(p),t=todayStr(0);
+  if(st==='overdue') return tbadge('Overdue \u00b7 '+fmtSchedDate(e),'#a33333');
+  if(st==='future') return tbadge(e>s?fmtSchedDate(s)+' \u2013 '+fmtSchedDate(e):fmtSchedDate(s),'#2f2a7a');
+  if(s===t&&e===t) return tbadge('Today','#2f2a7a');
+  if(e===t) return tbadge('Ends today','#2f2a7a');
+  if(s===t) return tbadge('Today \u2013 '+fmtSchedDate(e),'#2f2a7a');
+  return tbadge('Ends '+fmtSchedDate(e),'#2f2a7a');
+}
+function hideCardMenus(){ Array.prototype.forEach.call(document.querySelectorAll('.cardmenu .cmenu'),function(x){x.style.display='none';}); }
+function schedQuick(id,off){
+  var p=projById(id); if(!p)return;
+  p.schedStart=todayStr(off); p.schedEnd=todayStr(off);
+  hideCardMenus(); save(); render();
+  toast(off===0?'Scheduled for today':'Scheduled for tomorrow');
+}
+function schedClear(id){
+  var p=projById(id); if(!p)return;
+  p.schedStart=''; p.schedEnd='';
+  hideCardMenus(); save(); render(); toast('Date cleared');
+}
+var schedDlgId=null;
+function openSchedDialog(id){
+  var p=projById(id); if(!p)return; schedDlgId=id;
+  hideCardMenus();
+  var old=document.getElementById('schedDlg'); if(old)old.remove();
+  var s=p.schedStart||todayStr(0), e=p.schedEnd||p.schedStart||s;
+  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='schedDlg';
+  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Schedule job</h3><button class="dlg-x" aria-label="Close" onclick="closeSchedDialog()">\u00d7</button></div>'
+    +'<p class="mut" style="margin:2px 0 12px">'+esc(p.name)+cwSuffix(p)+'</p>'
+    +'<label>Start date</label><input id="scd_start" type="date" value="'+s+'">'
+    +'<label>End date</label><input id="scd_end" type="date" value="'+e+'">'
+    +'<div class="row" style="margin-top:12px"><button class="btn sec" onclick="schedDlgQuick(0)">Today</button><button class="btn sec" onclick="schedDlgQuick(1)">Tomorrow</button></div>'
+    +'<button class="btn grn" style="width:100%;margin-top:12px" onclick="schedDialogSave()">Save dates</button>'
+    +(p.schedStart?'<button class="btn sec" style="width:100%;margin-top:8px" onclick="schedClear(schedDlgId);closeSchedDialog()">Clear date</button>':'')
+    +'</div>';
+  ov.addEventListener('click',function(ev){ if(ev.target===ov) closeSchedDialog(); });
+  document.body.appendChild(ov);
+}
+function closeSchedDialog(){ var o=document.getElementById('schedDlg'); if(o)o.remove(); schedDlgId=null; }
+function schedDlgQuick(off){ var s=document.getElementById('scd_start'),e=document.getElementById('scd_end'); if(s)s.value=todayStr(off); if(e)e.value=todayStr(off); }
+function schedDialogSave(){
+  var p=projById(schedDlgId); if(!p){ closeSchedDialog(); return; }
+  var s=val('scd_start'), e=val('scd_end');
+  if(!s){ toast('Pick a start date'); return; }
+  if(!e)e=s;
+  if(e<s){ toast('End date is before the start date'); return; }
+  p.schedStart=s; p.schedEnd=e; save(); closeSchedDialog(); render();
+  toast('Scheduled '+schedLabel(p));
+}
 function renderProjects(){
   var h='<div id="projForm" style="display:none"><div class="card"><h3>New project</h3>'
     +'<label>Project name *</label><input id="np_name" placeholder="e.g. Lobby camera install">'
     +'<div class="row"><div><label>Customer</label><input id="np_customer"></div>'
     +'<div><label>Site</label><input id="np_site"></div></div>'
     +'<label>ConnectWise ticket #</label><input id="np_ticket" inputmode="numeric">'
+    +'<div class="row"><div><label>Scheduled start (optional)</label><input id="np_sched_start" type="date"></div>'
+    +'<div><label>End date</label><input id="np_sched_end" type="date"></div></div>'
     +'<label>Notes</label><textarea id="np_notes"></textarea>'
     +'<button class="btn grn" onclick="createProject()">Create project</button></div></div>';
   if(!data.projects.length){
@@ -2229,25 +2287,36 @@ function renderProjects(){
     +'<button class="btn" style="background:var(--teal);flex:0 0 auto;width:auto" onclick="fabNewProject()">+ New Project</button></div>';
   var shown=[];
   if(data.projects.length){
-    var nA=data.projects.filter(function(p){return (p.status||'active')!=='done';}).length;
-    var nD=data.projects.length-nA;
+    var nO=data.projects.filter(function(p){return (p.status||'active')!=='done';}).length;
+    var nC=data.projects.length-nO;
+    var nS=data.projects.filter(function(p){var st=schedState(p);return (p.status||'active')!=='done'&&(st==='overdue'||st==='today');}).length;
     var tabBtn=function(t,label,n,fill,txt){
       var on=projTab===t;
       return '<button onclick="setProjTab(\''+t+'\')" style="flex:1;padding:11px;border-radius:10px;cursor:pointer;font-weight:600;'
         +'border:1px solid '+(on?fill:'var(--line)')+';background:'+(on?fill:'var(--chip)')+';color:'+(on?'#e8f0f8':txt)+'">'
         +label+' ('+n+')</button>';};
     h+='<div style="display:flex;gap:6px;margin:12px 0">'
-      +tabBtn('active','Active',nA,'#1a5c3c','#56d69e')
-      +tabBtn('done','Closed',nD,'#7a2828','#f87171')
+      +tabBtn('scheduled','Scheduled',nS,'#2f2a7a','#a5b4fc')
+      +tabBtn('open','Open',nO,'#1a5c3c','#56d69e')
+      +tabBtn('closed','Closed',nC,'#7a2828','#f87171')
       +'</div>';
-    shown=data.projects.filter(function(p){return ((p.status||'active')==='done')===(projTab==='done');})
-      .sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
-    if(!shown.length)
-      h+='<div class="card" style="margin-top:12px"><p class="mut">'
-        +(projTab==='done'?'No closed projects yet.':'No active projects.')+'</p></div>';
+    if(projTab==='scheduled'){
+      shown=data.projects.filter(function(p){var st=schedState(p);return (p.status||'active')!=='done'&&(st==='overdue'||st==='today');});
+    } else {
+      shown=data.projects.filter(function(p){return ((p.status||'active')==='done')===(projTab==='closed');})
+        .sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+    }
+    if(!shown.length){
+      if(projTab==='scheduled')
+        h+='<div class="card" style="margin-top:12px"><h3>Nothing scheduled for today</h3><p class="mut">Jobs with dates covering today show up here. Set a date from any job\u2019s \u22ee menu.</p>'
+          +'<button class="btn" onclick="setProjTab(\'open\')">See open jobs ('+nO+')</button></div>';
+      else
+        h+='<div class="card" style="margin-top:12px"><p class="mut">'
+          +(projTab==='closed'?'No closed projects yet.':'No open projects.')+'</p></div>';
+    }
   }
   if(data.projects.length)
-    h+='<div class="deskonly" style="font-size:1.25rem;font-weight:800;margin:16px 2px 10px">'+(projTab==='done'?'Closed projects':'Active projects')+'</div>';
+    h+='<div class="deskonly" style="font-size:1.25rem;font-weight:800;margin:16px 2px 10px">'+(projTab==='closed'?'Closed projects':projTab==='scheduled'?'Scheduled for today':'Open projects')+'</div>';
   var cardHTML=function(p){
     var done=(p.status||'active')==='done';
     var pc=projColor(p);
@@ -2256,17 +2325,32 @@ function renderProjects(){
       +'<div class="proj-head"><div class="grow"><h3 style="font-size:1.12rem">'+esc(p.name)+cwTag(p)+'</h3>'
       +'<div class="mut">'+esc(p.customer||'')+(p.customer&&p.site?' · ':'')+esc(p.site||'')+'</div></div>'
       +'<div class="cardmenu"><button class="iconbtn" aria-label="Project actions" onclick="event.stopPropagation();toggleCardMenu(\''+p.id+'\')">&#8942;</button>'
-      +'<div class="cmenu" id="cmenu-'+p.id+'" style="display:none"><button onclick="event.stopPropagation();exportProject(\''+p.id+'\')">Export</button><button class="danger" onclick="event.stopPropagation();delProject(\''+p.id+'\')">Delete</button></div></div></div>'
+      +'<div class="cmenu" id="cmenu-'+p.id+'" style="display:none">'
+      +(done?'':'<div style="padding:7px 12px 3px;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--mut)">SCHEDULE</div>'
+      +'<button onclick="event.stopPropagation();schedQuick(\''+p.id+'\',0)">Today</button>'
+      +'<button onclick="event.stopPropagation();schedQuick(\''+p.id+'\',1)">Tomorrow</button>'
+      +'<button onclick="event.stopPropagation();openSchedDialog(\''+p.id+'\')">Pick dates\u2026</button>'
+      +(p.schedStart?'<button onclick="event.stopPropagation();schedClear(\''+p.id+'\')">Clear date</button>':'')
+      +'<div style="border-top:1px solid var(--line);margin:4px 0"></div>')
+      +'<button onclick="event.stopPropagation();exportProject(\''+p.id+'\')">Export</button><button class="danger" onclick="event.stopPropagation();delProject(\''+p.id+'\')">Delete</button></div></div></div>'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">'
-      +tbadge(done?'closed':'active',done?'#a33333':'#1e7a46')
+      +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+tbadge(done?'closed':'active',done?'#a33333':'#1e7a46')+(done?'':schedPill(p))+'</div>'
       +'<b style="font-size:1.35rem;color:'+pc+'">'+fmtHM(myProjectMinutes(p.id))+'</b></div></div>';
   };
-  var weekCut=Date.now()-7*864e5;
-  var week=shown.filter(function(p){return lastActivityTs(p)>=weekCut;})
-    .sort(function(a,b){return lastActivityTs(b)-lastActivityTs(a);});
-  var rest=shown.filter(function(p){return lastActivityTs(p)<weekCut;});
-  if(week.length){ h+='<div class="seclbl">This week</div><div class="projgrid">'; week.forEach(function(p){h+=cardHTML(p);}); h+='</div>'; }
-  if(rest.length){ h+='<div class="seclbl">All projects</div><div class="projgrid">'; rest.forEach(function(p){h+=cardHTML(p);}); h+='</div>'; }
+  if(projTab==='scheduled'){
+    var byEnd=function(a,b){var ea=schedEnd(a),eb=schedEnd(b);return ea<eb?-1:ea>eb?1:(b.createdAt||0)-(a.createdAt||0);};
+    var over=shown.filter(function(p){return schedState(p)==='overdue';}).sort(byEnd);
+    var tod=shown.filter(function(p){return schedState(p)==='today';}).sort(byEnd);
+    if(over.length){ h+='<div class="seclbl">Overdue</div><div class="projgrid">'; over.forEach(function(p){h+=cardHTML(p);}); h+='</div>'; }
+    if(tod.length){ h+='<div class="seclbl">Today</div><div class="projgrid">'; tod.forEach(function(p){h+=cardHTML(p);}); h+='</div>'; }
+  } else {
+    var weekCut=Date.now()-7*864e5;
+    var week=shown.filter(function(p){return lastActivityTs(p)>=weekCut;})
+      .sort(function(a,b){return lastActivityTs(b)-lastActivityTs(a);});
+    var rest=shown.filter(function(p){return lastActivityTs(p)<weekCut;});
+    if(week.length){ h+='<div class="seclbl">This week</div><div class="projgrid">'; week.forEach(function(p){h+=cardHTML(p);}); h+='</div>'; }
+    if(rest.length){ h+='<div class="seclbl">All projects</div><div class="projgrid">'; rest.forEach(function(p){h+=cardHTML(p);}); h+='</div>'; }
+  }
   h+='<button class="fab" aria-label="New project" onclick="fabNewProject()">+</button>';
   $('app').innerHTML=h;
   if(deskQuery)deskFilter(deskQuery);
@@ -2284,8 +2368,11 @@ function toggleProjForm(){var f=$('projForm');f.style.display=f.style.display===
 function toggleImportForm(){var f=$('importForm');f.style.display=f.style.display==='none'?'block':'none';}
 function createProject(){
   var name=val('np_name');if(!name){toast('Project name is required');return;}
+  var ss=val('np_sched_start'),se=val('np_sched_end');
+  if(ss){ if(!se)se=ss; if(se<ss){toast('End date is before the start date');return;} }
   data.projects.push({id:uid(),createdAt:Date.now(),name:name,customer:val('np_customer'),site:val('np_site'),
     ticket:val('np_ticket'),notes:val('np_notes'),status:'active',technicians:[],
+    schedStart:ss||'',schedEnd:ss?se:'',
     enabledModules:DEFAULT_MODULES.slice()});
   save();render();toast('Project created');}
 function pruneLocalProject(id){
@@ -2442,6 +2529,7 @@ function overviewHTML(p){
     +'<div class="kv"><span class="mut">Site</span><b>'+esc(p.site||'—')+'</b></div>'
     +'<div class="kv"><span class="mut">ConnectWise ticket</span><b>'+esc(p.ticket||'—')+'</b></div>'
     +'<div class="kv"><span class="mut">Status</span><b>'+esc(p.status||'active')+'</b></div>'
+    +'<div class="kv"><span class="mut">Scheduled</span><b>'+esc(schedLabel(p))+'</b></div>'
     +(p.notes?'<div class="kv"><span class="mut">Notes</span><b>'+esc(p.notes)+'</b></div>':'')
     
     +'<div id="editProj"></div></div>';
@@ -2575,11 +2663,16 @@ function editProjectForm(){
     +'<div class="row"><div><label>Customer</label><input id="ep_customer" value="'+esc(p.customer||'')+'"></div>'
     +'<div><label>Site</label><input id="ep_site" value="'+esc(p.site||'')+'"></div></div>'
     +'<label>ConnectWise ticket #</label><input id="ep_ticket" value="'+esc(p.ticket||'')+'">'
+    +'<div class="row"><div><label>Scheduled start</label><input id="ep_sched_start" type="date" value="'+esc(p.schedStart||'')+'"></div>'
+    +'<div><label>End date</label><input id="ep_sched_end" type="date" value="'+esc(p.schedEnd||p.schedStart||'')+'"></div></div>'
     +'<label>Notes</label><textarea id="ep_notes">'+esc(p.notes||'')+'</textarea>'
     +'<button class="btn grn" onclick="saveProjectEdit()">Save changes</button></div>';}
 function saveProjectEdit(){var p=projById(view.id);
+  var ss=val('ep_sched_start'),se=val('ep_sched_end');
+  if(ss){ if(!se)se=ss; if(se<ss){toast('End date is before the start date');return;} }
   p.name=val('ep_name')||p.name;p.customer=val('ep_customer');p.site=val('ep_site');
-  p.ticket=val('ep_ticket');p.notes=val('ep_notes');save();render();toast('Project updated');}
+  p.ticket=val('ep_ticket');p.notes=val('ep_notes');
+  p.schedStart=ss||'';p.schedEnd=ss?se:'';save();render();toast('Project updated');}
 /* ============ TIME TAB ============ */
 var teEditId=null;
 function modHero(p,label,metric){
@@ -3345,6 +3438,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.7',items:['Projects: new Scheduled / Open / Closed tabs \u2014 Scheduled opens first, showing today\u2019s jobs plus anything overdue','Jobs can carry a scheduled date range: set it from the job\u2019s \u22ee menu (Today, Tomorrow, or Pick dates), the New Project form, or Edit details','Date pills on job cards: Today, Ends Wed, Nov 4, or Overdue in red \u2014 clear the date any time to make it a plain open job']},
  {v:'5.6',items:['New theme: darker palette, indigo accent, Plus Jakarta Sans + JetBrains Mono','Enterprise header: breadcrumbs, live sync badge, command palette (Ctrl/⌘K)','Live Tech Radar in Admin: who is on the clock, with live elapsed clocks','Switch chassis view on the port tab: faceplate, density, click a port to inspect','PoE power allocation bar: watts per device against the switch budget']},
  {v:'5.5.1',items:['Cable options fix: an Admin save now updates the project dropdowns immediately \u2014 the old refetch left a stale window and only re-rendered the Admin view','Failed saves still leave the lists untouched with an error toast']},
  {v:'5.5',items:['Stopping a timer now opens a dialog: enter notes, correct the start/end times, and pick a lunch deduction in 15-minute steps (0, 0.25, 0.5, 0.75, 1 hours)','The entry is saved first, then edited \u2014 Keep as-is leaves it exactly as stopped','Same guardrails as the timesheet edit: end must be after start, lunch must be shorter than the entry']},
@@ -3664,6 +3758,7 @@ function toDB(table,r,isNew){
       o.name=r.name||''; o.customer=r.customer||null; o.site=r.site||null;
       o.ticket=r.ticket||null; o.notes=r.notes||null; o.status=r.status||'active';
       o.enabled_modules=r.enabledModules||[];
+      o.sched_start=r.schedStart||null; o.sched_end=r.schedEnd||null;
       if(r.deleted_at) o.deleted_at=r.deleted_at;
       if(sbUser) o.updated_by=sbUser.id;
       if(isNew&&sbUser) o.owner_id=sbUser.id;
@@ -3709,6 +3804,7 @@ function fromDB(table,r){
       o.name=r.name||''; o.customer=r.customer||''; o.site=r.site||'';
       o.ticket=r.ticket||''; o.notes=r.notes||''; o.status=r.status||'active';
       o.enabledModules=r.enabled_modules||[]; o.owner_id=r.owner_id||null;
+      o.schedStart=r.sched_start||''; o.schedEnd=r.sched_end||'';
       o.deleted_at=r.deleted_at||null; o.updatedBy=r.updated_by||null;
       o.createdAt=tsOf(r.created_at); o.technicians=[]; break;
     case 'time_entries':

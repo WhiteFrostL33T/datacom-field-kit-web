@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v5.6
+**Current version:** v5.7
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v5.7** — v5.7 - Projects: Scheduled / Open / Closed tabs (Scheduled is the new default, showing today's jobs plus anything overdue). Jobs can carry a scheduled date range: set it from the job's menu (Today, Tomorrow, Pick dates), the New Project form, or Edit details. Date pills on job cards (Today / Ends date / Overdue). Needs the v5.7 migration (projects.sched_start / sched_end).
 
 - **v5.6** — Enterprise header, command palette, Live Tech Radar, switch chassis view, new indigo theme (merged from Jeremy's Drive update)
 
