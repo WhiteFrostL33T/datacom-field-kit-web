@@ -995,7 +995,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.8';
+var APP_VERSION='5.8.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -3337,6 +3337,7 @@ function delMaterial(id){if(!confirm('Delete this material line?'))return;
   data.materials=data.materials.filter(function(x){return x.id!==id;});save();render();}
 /* ============ DASHBOARD ============ */
 function fmtFeedTime(t){return new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}
+function fmtFeedRange(e){ var s=new Date(e.startISO),en=e.endISO?new Date(e.endISO):null; if(isNaN(s))return ''; var f=function(d){return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}; if(!en||isNaN(en)||en<=s)return f(s); var sm=f(s),em=f(en); if(sm.slice(-2)===em.slice(-2)&&/AM|PM/.test(sm.slice(-2)))sm=sm.slice(0,-3); return sm+'\u2013'+em; }
 function fmtFeedDate(t){return new Date(t).toLocaleDateString([],{month:'numeric',day:'numeric'});}
 function feedItem(it){
   var icons={
@@ -3348,7 +3349,7 @@ function feedItem(it){
   if(it.type==='time'){
     title=it.e.kind+' \u00b7 '+fmtHM(entryMinutes(it.e));
     if(it.e.notes)sub+=' \u00b7 '+it.e.notes;
-    when=it.t?fmtFeedTime(it.t):'';
+    when=fmtFeedRange(it.e)||(it.t?fmtFeedTime(it.t):'');
   }else if(it.type==='pull'){
     title=it.e.run+' \u00b7 '+it.e.used+' ft';
     if(it.e.box)sub+=' \u00b7 '+it.e.box;
@@ -3503,6 +3504,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.8.1',items:['Recent activity now shows start and end times for time entries (for example 10:15\u201311:00 AM) instead of just the start time']},
  {v:'5.8',items:['New: Notifications \u2014 tap the bell in the header for overdue jobs, today\u2019s schedule, crew activity since your last visit, and a nudge if a timer runs past 10 hours','Header on phones: search is now just a magnifying-glass icon, making room for the bell','Cleaner three-dot menu: actions grouped under Project / Data / App, and Refresh now removed \u2014 the sync badge, pull-to-refresh, and the palette all refresh too']},
  {v:'5.7.1',items:['Switching tabs or views now starts at the top of the page','Pull down to refresh now refreshes the page you are on with the latest server data, instead of restarting the app']},
  {v:'5.7',items:['Projects: new Scheduled / Open / Closed tabs \u2014 Scheduled opens first, showing today\u2019s jobs plus anything overdue','Jobs can carry a scheduled date range: set it from the job\u2019s \u22ee menu (Today, Tomorrow, or Pick dates), the New Project form, or Edit details','Date pills on job cards: Today, Ends Wed, Nov 4, or Overdue in red \u2014 clear the date any time to make it a plain open job']},
