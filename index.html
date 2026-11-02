@@ -48,6 +48,7 @@
 
 html,body{
   margin:0;padding:0;
+  overscroll-behavior:none;
   background-color:var(--bg);
   background-image:
     radial-gradient(circle at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 50%),
@@ -983,7 +984,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.7';
+var APP_VERSION='5.7.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1894,6 +1895,7 @@ function renderTabBar(){
     return '<button class="btab'+(active===t.id?' act':'')+'" onclick="go'+t.label+'()">'+t.icon+'<span>'+t.label+'</span></button>';
   }).join('');
 }
+var lastNavKey='';
 function render(skipTrack){
   pendingRemote=false; formDirty=false; hideUpdPill();
   renderHdrMenu();
@@ -1930,6 +1932,8 @@ function render(skipTrack){
   else if(view.name==='admin'){ renderAdmin(); startRadarTicker(); }
   else renderProject();
   renderTabBar();
+  var nk=view.name+'|'+(view.id||'')+'|'+(view.name==='project'?curTab:'');
+  if(nk!==lastNavKey){ lastNavKey=nk; window.scrollTo(0,0); }
   if(!skipTrack)trackNav(true);
 }
 /* ============ timer ============ */
@@ -2103,7 +2107,7 @@ function closeStopDialog(){
 /* ============ PROJECTS LIST ============ */
 var projTab='scheduled';
 var deskQuery='';
-function setProjTab(t){projTab=t;renderProjects();}
+function setProjTab(t){projTab=t;renderProjects();window.scrollTo(0,0);}
 function greetParts(){
   var now=new Date(); var hr=now.getHours();
   return { greet: hr<12?'Good morning':hr<17?'Good afternoon':'Good evening',
@@ -2264,6 +2268,50 @@ function schedDialogSave(){
   p.schedStart=s; p.schedEnd=e; save(); closeSchedDialog(); render();
   toast('Scheduled '+schedLabel(p));
 }
+/* ---- pull-to-refresh: refresh the current view, never reboot ---- */
+var ptrStartY=null, ptrStartX=null, ptrActive=false, ptrBusy=false;
+function ptrIndEl(){
+  var el=document.getElementById('ptrInd');
+  if(!el){
+    el=document.createElement('div'); el.id='ptrInd';
+    el.style.cssText='position:fixed;left:50%;top:10px;transform:translate(-50%,-70px);z-index:90;background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 16px;border-radius:999px;font-size:.85rem;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.45);transition:transform .15s ease;pointer-events:none;white-space:nowrap';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function ptrShow(dy,ready){
+  var el=ptrIndEl();
+  el.textContent=ptrBusy?'Refreshing\u2026':(ready?'\u2191 Release to refresh':'\u2193 Pull to refresh');
+  el.style.transform='translate(-50%,'+Math.min(56,Math.max(0,dy*0.5))+'px)';
+}
+function ptrHide(){ var el=document.getElementById('ptrInd'); if(el) el.style.transform='translate(-50%,-70px)'; }
+function ptrBlocked(){
+  if(document.querySelector('.dlg-ov')) return true;
+  var m=document.getElementById('cmdPaletteModal'); if(m&&m.style.display!=='none') return true;
+  return false;
+}
+document.addEventListener('touchstart',function(e){
+  if(e.touches.length!==1||window.scrollY>0||ptrBlocked()){ ptrActive=false; return; }
+  ptrStartY=e.touches[0].clientY; ptrStartX=e.touches[0].clientX; ptrActive=true;
+},{passive:true});
+document.addEventListener('touchmove',function(e){
+  if(!ptrActive) return;
+  if(window.scrollY>0){ ptrActive=false; ptrHide(); return; }
+  var dy=e.touches[0].clientY-ptrStartY, dx=Math.abs(e.touches[0].clientX-ptrStartX);
+  if(dy<=0||dx>dy){ if(dy<=-4){ ptrActive=false; ptrHide(); } return; }
+  if(e.cancelable) e.preventDefault();
+  ptrShow(dy,dy>=70);
+},{passive:false});
+document.addEventListener('touchend',function(e){
+  if(!ptrActive) return; ptrActive=false;
+  var dy=e.changedTouches[0].clientY-ptrStartY;
+  if(dy>=70&&!ptrBusy){
+    ptrBusy=true; ptrShow(56,true);
+    var done=function(){ ptrBusy=false; ptrHide(); };
+    try{ refreshFromServer(true).then(done,done); }catch(err){ done(); }
+  } else ptrHide();
+});
+document.addEventListener('touchcancel',function(){ ptrActive=false; ptrHide(); });
 function renderProjects(){
   var h='<div id="projForm" style="display:none"><div class="card"><h3>New project</h3>'
     +'<label>Project name *</label><input id="np_name" placeholder="e.g. Lobby camera install">'
@@ -3438,6 +3486,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.7.1',items:['Switching tabs or views now starts at the top of the page','Pull down to refresh now refreshes the page you are on with the latest server data, instead of restarting the app']},
  {v:'5.7',items:['Projects: new Scheduled / Open / Closed tabs \u2014 Scheduled opens first, showing today\u2019s jobs plus anything overdue','Jobs can carry a scheduled date range: set it from the job\u2019s \u22ee menu (Today, Tomorrow, or Pick dates), the New Project form, or Edit details','Date pills on job cards: Today, Ends Wed, Nov 4, or Overdue in red \u2014 clear the date any time to make it a plain open job']},
  {v:'5.6',items:['New theme: darker palette, indigo accent, Plus Jakarta Sans + JetBrains Mono','Enterprise header: breadcrumbs, live sync badge, command palette (Ctrl/⌘K)','Live Tech Radar in Admin: who is on the clock, with live elapsed clocks','Switch chassis view on the port tab: faceplate, density, click a port to inspect','PoE power allocation bar: watts per device against the switch budget']},
  {v:'5.5.1',items:['Cable options fix: an Admin save now updates the project dropdowns immediately \u2014 the old refetch left a stale window and only re-rendered the Admin view','Failed saves still leave the lists untouched with an error toast']},
