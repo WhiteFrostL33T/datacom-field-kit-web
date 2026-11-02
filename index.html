@@ -597,7 +597,7 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
 .bc-item.bc-brand{color:var(--text);font-weight:700;}
 .bc-item.bc-current{color:#f8fafc;font-weight:700;cursor:default;}
 .bc-sep{color:#475569;font-size:.78rem;user-select:none;}
-@media (max-width:480px){ .bc-brand,.bc-brand + .bc-sep{display:none;} }
+@media (max-width:480px){ .bc-brand,.bc-brand + .bc-sep{display:none;} .k-cmd-kbd{display:none;} .k-cmd-btn{padding:6px 9px;} }
 .bc-tag{background:rgba(99,102,241,0.2);color:#c7d2fe;padding:2px 8px;border-radius:6px;font-size:.78rem;font-weight:600;border:1px solid rgba(99,102,241,0.3);}
 
 /* --- Command Palette Trigger Button --- */
@@ -613,6 +613,13 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
   border-radius:6px;padding:2px 5px;font-family:'JetBrains Mono',monospace;
   font-size:.72rem;color:#cbd5e1;line-height:1;
 }
+.bellbtn{position:relative;width:44px;height:44px;border-radius:12px;background:var(--chip);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer;flex:0 0 auto}
+.bellbtn:hover{background:rgba(99,102,241,0.12)}
+.bellcount{position:absolute;top:-6px;right:-6px;background:#e5484d;color:#fff;font-size:11px;font-weight:700;min-width:20px;height:20px;border-radius:10px;display:none;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--bg)}
+.mglbl{font-size:.66rem;letter-spacing:.09em;color:var(--muted);padding:9px 16px 2px;font-weight:700}
+.mdiv{height:1px;background:var(--line);margin:6px 0}
+.nrow{display:flex;gap:10px;align-items:flex-start}
+.nchev{margin-left:auto;color:var(--muted);font-size:1.2rem;line-height:1;padding-top:2px}
 
 /* --- Real-Time Telemetry Pill --- */
 .telemetry-pill{
@@ -903,6 +910,10 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
       <span class="cmd-label deskonly">Search / Actions</span>
       <span class="k-cmd-kbd">⌘K</span>
     </button>
+    <button class="bellbtn" id="btnBell" onclick="goNotifications()" title="Notifications" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="bellcount" id="bellCount" style="display:none"></span>
+    </button>
     <div id="syncBadge" class="telemetry-pill telemetry-ok" onclick="refreshFromServer(true)" title="Click to refresh from server">
       <span class="telemetry-dot dot-ok pulse" id="syncBadgeDot"></span>
       <span class="telemetry-text deskonly" id="syncBadgeText">Live Sync</span>
@@ -984,7 +995,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.7.1';
+var APP_VERSION='5.8';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1210,6 +1221,8 @@ function renderBreadcrumb(){
     h+='<span class="bc-sep">/</span><span class="bc-item bc-current">Timer</span>';
   } else if(view.name==='activity'){
     h+='<span class="bc-sep">/</span><span class="bc-item bc-current">Activity</span>';
+  } else if(view.name==='notifications'){
+    h+='<span class="bc-sep">/</span><span class="bc-item bc-current">Notifications</span>';
   } else if(view.name==='timesheet'){
     h+='<span class="bc-sep">/</span><span class="bc-item bc-current">Daily Timesheet</span>';
   } else if(view.name==='backup'){
@@ -1912,9 +1925,11 @@ function render(skipTrack){
     view.name==='backup'?'Backup / Restore':
     view.name==='about'?'About':
     view.name==='admin'?'Admin':
+    view.name==='notifications'?'Notifications':
     (projById(view.id)?projById(view.id).name:'Project');
   renderBreadcrumb();
   updateSyncBadge();
+  updateBell();
   renderTimerBar();
   if(view.name==='dashboard'){
     if(!crewTimersLoaded&&sb&&sbUser){
@@ -1926,11 +1941,13 @@ function render(skipTrack){
   else if(view.name==='projects')renderProjects();
   else if(view.name==='timer')renderTimer();
   else if(view.name==='activity')renderActivity();
+  else if(view.name==='notifications')renderNotifications();
   else if(view.name==='timesheet')renderTimesheet();
   else if(view.name==='backup')renderBackup();
   else if(view.name==='about')renderAbout();
   else if(view.name==='admin'){ renderAdmin(); startRadarTicker(); }
   else renderProject();
+  if(view.name!=='notifications')notifSnapshot=null;
   renderTabBar();
   var nk=view.name+'|'+(view.id||'')+'|'+(view.name==='project'?curTab:'');
   if(nk!==lastNavKey){ lastNavKey=nk; window.scrollTo(0,0); }
@@ -3486,6 +3503,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.8',items:['New: Notifications \u2014 tap the bell in the header for overdue jobs, today\u2019s schedule, crew activity since your last visit, and a nudge if a timer runs past 10 hours','Header on phones: search is now just a magnifying-glass icon, making room for the bell','Cleaner three-dot menu: actions grouped under Project / Data / App, and Refresh now removed \u2014 the sync badge, pull-to-refresh, and the palette all refresh too']},
  {v:'5.7.1',items:['Switching tabs or views now starts at the top of the page','Pull down to refresh now refreshes the page you are on with the latest server data, instead of restarting the app']},
  {v:'5.7',items:['Projects: new Scheduled / Open / Closed tabs \u2014 Scheduled opens first, showing today\u2019s jobs plus anything overdue','Jobs can carry a scheduled date range: set it from the job\u2019s \u22ee menu (Today, Tomorrow, or Pick dates), the New Project form, or Edit details','Date pills on job cards: Today, Ends Wed, Nov 4, or Overdue in red \u2014 clear the date any time to make it a plain open job']},
  {v:'5.6',items:['New theme: darker palette, indigo accent, Plus Jakarta Sans + JetBrains Mono','Enterprise header: breadcrumbs, live sync badge, command palette (Ctrl/⌘K)','Live Tech Radar in Admin: who is on the clock, with live elapsed clocks','Switch chassis view on the port tab: faceplate, density, click a port to inspect','PoE power allocation bar: watts per device against the switch budget']},
@@ -4598,19 +4616,118 @@ function renderHdrMenu(){
   if(view.name==='project'){
     var p=projById(view.id);
     if(p&&(!p.owner_id||(sbUser&&p.owner_id===sbUser.id)))
-      h+='<button onclick="openShareDialog()">Share project</button>';
+      h+='<div class="mglbl">PROJECT</div><button onclick="openShareDialog()">Share project</button>';
   }
-  h+='<button onclick="openImportForm()">Import project</button>'
+  h+='<div class="mglbl">DATA</div>'
+    +'<button onclick="openImportForm()">Import project</button>'
     +'<button onclick="goBackup()">Backup / Restore</button>'
-    +'<button onclick="goAbout()">About</button>';
+    +'<div class="mglbl">APP</div>';
   if(isAdmin) h+='<button onclick="goAdmin()">Admin</button>';
+  h+='<button onclick="goAbout()">About</button>';
   if(sbReady&&sbUser){
     h+='<button onclick="openDiag()">Diagnostics</button>'
-      +'<button onclick="refreshFromServer(true)">Refresh now</button>'
+      +'<div class="mdiv"></div>'
       +'<button onclick="doSignOut()">Sign out</button>';
   }
   m.innerHTML=h;
 }
+
+/* ============ Notifications (in-app, derived from loaded data) ============ */
+var notifSnapshot=null;
+function notifKey(){ return 'fk_notif_seen_v1_'+(sbUser?sbUser.id:'anon'); }
+function notifStore(){
+  var raw=null; try{ raw=localStorage.getItem(notifKey()); }catch(e){}
+  if(raw){ try{ var o=JSON.parse(raw); if(o&&o.seenTs) return o; }catch(e){} }
+  var init={seenTs:Date.now(),seenDay:''};
+  try{ localStorage.setItem(notifKey(),JSON.stringify(init)); }catch(e){}
+  return init;
+}
+function notifMarkRead(){
+  try{ localStorage.setItem(notifKey(),JSON.stringify({seenTs:Date.now(),seenDay:todayStr(0)})); }catch(e){}
+}
+function computeNotifications(){
+  var out={attention:[],today:[],crew:[]};
+  if(!sbUser) return out;
+  var myId=sbUser.id;
+  data.projects.forEach(function(p){
+    if(p.status!=='active')return;
+    var st=schedState(p);
+    if(st==='overdue') out.attention.push({kind:'overdue',p:p});
+    else if(st==='today') out.today.push({kind:'today',p:p});
+  });
+  out.attention.sort(function(a,b){return schedEnd(a.p)<schedEnd(b.p)?-1:1;});
+  out.today.sort(function(a,b){return schedEnd(a.p)<schedEnd(b.p)?-1:1;});
+  if(data.timer){
+    var elMin=Math.floor((Date.now()-new Date(data.timer.startISO).getTime())/60000);
+    if(elMin>=600) out.attention.push({kind:'timer',mins:elMin});
+  }
+  var seen=notifStore().seenTs, weekAgo=Date.now()-7*864e5, ev=[];
+  function pushEv(t,type,e){ if(!isFinite(t)||t<=seen||t<weekAgo)return; if(!e.userId||e.userId===myId)return; ev.push({t:t,type:type,e:e}); }
+  data.timeEntries.forEach(function(e){ pushEv(new Date(e.startISO).getTime(),'time',e); });
+  data.pulls.forEach(function(p){ pushEv(p.createdAt||0,'pull',p); });
+  data.materials.forEach(function(m){ pushEv(m.createdAt||0,'mat',m); });
+  ev.sort(function(a,b){return b.t-a.t;});
+  out.crew=ev.slice(0,15);
+  return out;
+}
+function notifUnreadCount(){
+  if(!sbUser)return 0;
+  var n=computeNotifications(), s=notifStore(), c=n.crew.length;
+  if(s.seenDay!==todayStr(0)) c+=n.attention.length+n.today.length;
+  return c;
+}
+function updateBell(){
+  var el=$('bellCount'); if(!el)return;
+  var c=0; try{ c=notifUnreadCount(); }catch(e){}
+  el.textContent=c; el.style.display=c?'flex':'none';
+}
+function goNotifications(){
+  if(!sbUser)return;
+  notifSnapshot=computeNotifications();
+  view={name:'notifications'}; render();
+  notifMarkRead(); updateBell();
+}
+function notifPill(bg,txt){ return '<span class="tbadge" style="background:'+bg+'">'+txt+'</span>'; }
+function notifRow(pillHtml,title,sub,onclick){
+  return '<div class="card" onclick="'+onclick+'" style="cursor:pointer"><div class="nrow"><div>'+pillHtml
+    +'<div style="font-weight:700;margin-top:6px">'+title+'</div><div class="mut">'+sub+'</div></div>'
+    +'<div class="nchev">\u203a</div></div></div>';
+}
+function renderNotifications(){
+  if(notifSnapshot===null) notifSnapshot=computeNotifications();
+  var n=notifSnapshot, now=new Date();
+  var h='<div style="margin:4px 2px 12px"><div class="mut" style="font-size:.95rem">'+esc(now.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}))+'</div>'
+    +'<div style="font-size:1.55rem;font-weight:800;margin-top:2px">Notifications</div></div>';
+  function whenLbl(t){ return dayOfTs(t)===todayStr(0)?new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):dayLabel(dayOfTs(t)); }
+  if(n.attention.length){
+    h+='<div class="seclbl">Needs attention</div>';
+    n.attention.forEach(function(it){
+      if(it.kind==='overdue') h+=notifRow(notifPill('#a33333','Overdue'),esc(it.p.name)+(it.p.ticket?' \u00b7 CW #'+esc(it.p.ticket):''),'Was scheduled to end '+fmtSchedDate(schedEnd(it.p))+' \u2014 still open',"openProject('"+it.p.id+"')");
+      else if(it.kind==='timer'){ var tp=projById(data.timer.projectId); h+=notifRow(notifPill('#6b4e12','Timer check'),'Your timer is still running',esc(data.timer.kind)+' \u00b7 '+esc(tp?tp.name:'(project deleted)')+' \u00b7 '+fmtHM(it.mins)+' and counting','goTimer()'); }
+    });
+  }
+  if(n.today.length){
+    h+='<div class="seclbl">Today</div>';
+    n.today.forEach(function(it){ var p=it.p;
+      h+=notifRow(notifPill('#2f2a7a','Scheduled'),esc(p.name),esc(p.customer||'')+(p.site?' \u00b7 '+esc(p.site):'')+(p.ticket?' \u00b7 CW #'+esc(p.ticket):'')+(schedEnd(p)>p.schedStart?' \u00b7 '+schedLabel(p):''),"openProject('"+p.id+"')");
+    });
+  }
+  if(n.crew.length){
+    h+='<div class="seclbl">Since last time</div>';
+    n.crew.forEach(function(it){ var e=it.e, who=esc(authorLabels[e.userId]||'Teammate'), p=projById(e.projectId);
+      var title, sub=esc(p?p.name:'a project')+' \u00b7 '+whenLbl(it.t);
+      if(it.type==='time') title=who+' logged '+fmtHM(entryMinutes(e))+' '+esc(e.kind);
+      else if(it.type==='pull') title=who+' added a cable pull ('+(Number(e.used)||0)+' ft)';
+      else title=who+' added '+(Number(e.qty)||0)+' \u00d7 '+esc(e.item||'materials');
+      h+=notifRow(notifPill('#1a5c3c','Crew'),title,sub,"openProject('"+e.projectId+"')");
+    });
+  }
+  if(!n.attention.length&&!n.today.length&&!n.crew.length){
+    h+='<div class="card"><h3>You\u2019re all caught up</h3><p class="mut">Nothing needs attention, nothing scheduled today, and nothing new from the crew.</p></div>';
+  }
+  $('app').innerHTML=h;
+}
+
 function openShareDialog(){
   var p=projById(view.id); if(!p||!sb||!sbUser) return;
   toggleHdrMenu();

@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v5.7.1
+**Current version:** v5.8
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v5.8** — Notifications: bell in the header with overdue jobs, today's schedule, crew activity since your last visit, and a timer check past 10 hours; mobile search is now just a magnifying-glass icon; the three-dot menu is grouped (Project / Data / App) with Refresh now removed.
 
 - **v5.7.1** — v5.7.1 - Switching tabs or views now starts at the top of the page. Pull down to refresh refreshes the page you are on with the latest server data, instead of restarting the app.
 
