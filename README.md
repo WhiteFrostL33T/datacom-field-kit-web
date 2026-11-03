@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v5.8.1
+**Current version:** v5.9
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v5.9** — Sign-in screen now shows your company name and logo (set in Field Kit Manage); the logo also becomes the app icon when installed
 
 - **v5.8.1** — v5.8.1 — Recent activity now shows start and end times for time entries (e.g. 10:15–11:00 AM) instead of just the start time.
 

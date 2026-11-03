@@ -995,7 +995,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.8.1';
+var APP_VERSION='5.9';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -3504,6 +3504,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.9',items:['Your company name and logo (set in Field Kit Manage) now show on the sign-in screen, and the logo becomes the app icon when Field Kit is installed']},
  {v:'5.8.1',items:['Recent activity now shows start and end times for time entries (for example 10:15\u201311:00 AM) instead of just the start time']},
  {v:'5.8',items:['New: Notifications \u2014 tap the bell in the header for overdue jobs, today\u2019s schedule, crew activity since your last visit, and a nudge if a timer runs past 10 hours','Header on phones: search is now just a magnifying-glass icon, making room for the bell','Cleaner three-dot menu: actions grouped under Project / Data / App, and Refresh now removed \u2014 the sync badge, pull-to-refresh, and the palette all refresh too']},
  {v:'5.7.1',items:['Switching tabs or views now starts at the top of the page','Pull down to refresh now refreshes the page you are on with the latest server data, instead of restarting the app']},
@@ -3636,6 +3637,108 @@ function initSupabase(){
   }catch(e){ sb=null; sbReady=false; }
 }
 
+/* ---------- company branding (v5.9) ----------
+   Read-only mirror of Field Kit Manage's company_settings row (id=1).
+   The sign-in screen is the only branded surface; the header and every
+   signed-in screen are untouched. Field Kit NEVER writes this table.
+   Boot paints from the localStorage cache (or stock), then a background
+   fetch refreshes it. Any failure leaves the stock v5.8.1 behaviour. */
+var FK_CO_KEY='fk_company_v1';
+var fkCompany=null; /* null = unknown yet; {name,logo} once cache/fetch lands ('' = none set) */
+var fkIconsTried=false;
+function fkCoCache(){
+  try{
+    var raw=localStorage.getItem(FK_CO_KEY);
+    if(!raw) return undefined;
+    var o=JSON.parse(raw);
+    if(o&&typeof o==='object') return {name:String(o.name||''),logo:String(o.logo||'')};
+  }catch(e){}
+  return undefined;
+}
+function fkCoStore(c){
+  try{ localStorage.setItem(FK_CO_KEY,JSON.stringify(c||{name:'',logo:''})); }catch(e){}
+}
+function fkBrandHTML(){
+  var c=fkCompany;
+  if(c&&c.name){
+    return (c.logo?'<img alt="" src="'+esc(c.logo)+'" style="max-width:72px;max-height:72px;border-radius:16px;margin-bottom:10px">':'')
+      +'<h2 style="margin:0 0 6px">'+esc(c.name)+'</h2>'
+      +'<p class="mut" style="margin:0">Datacom Field Kit</p>';
+  }
+  return '<h2 style="margin:0 0 6px">Field Kit</h2>'
+    +'<p class="mut" style="margin:0">Sign in to load your projects</p>';
+}
+function fkCoApply(){
+  var c=fkCompany;
+  if(c&&c.logo){
+    try{
+      var l=document.querySelector('link[rel="icon"]');
+      if(!l){ l=document.createElement('link'); l.rel='icon'; document.head.appendChild(l); }
+      l.type='image/png'; l.href=c.logo;
+    }catch(e){}
+  }
+  var el=document.getElementById('loginBrand');
+  if(el) el.innerHTML=fkBrandHTML();
+  if(c&&c.logo) fkBrandIcons();
+}
+function loadCompanyBrand(){
+  var cached=fkCoCache();
+  if(cached!==undefined){ fkCompany=cached; fkCoApply(); }
+  if(!sb||!sbReady) return;
+  try{
+    sb.from('company_settings').select('company_name,logo_data').eq('id',1).maybeSingle().then(function(r){
+      var c={name:'',logo:''};
+      if(r&&!r.error&&r.data){
+        c.name=String(r.data.company_name||'').trim();
+        c.logo=String(r.data.logo_data||'');
+      }
+      fkCompany=c; fkCoStore(c); fkCoApply();
+    },function(){ /* network failure: keep the cached state */ });
+  }catch(e){}
+}
+/* Install icons from the company logo (best effort): build 192/512 + a
+   padded maskable 512 on canvas and swap in a generated manifest that
+   mirrors the shipped static one (same name/short_name/colours). With no
+   logo set, the stock manifest and icons are left exactly as shipped. */
+function fkBrandIcons(){
+  if(fkIconsTried) return; fkIconsTried=true;
+  var c=fkCompany; if(!c||!c.logo) return;
+  var img=new Image();
+  img.onload=function(){
+    try{
+      function mkIcon(size,maskable){
+        var cv=document.createElement('canvas'); cv.width=size; cv.height=size;
+        var cx=cv.getContext('2d'); if(!cx) return null;
+        if(maskable){ cx.fillStyle='#090d16'; cx.fillRect(0,0,size,size); }
+        var target=maskable?size*0.8:size;
+        var sc=Math.min(target/img.width,target/img.height);
+        if(!(sc>0)) return null;
+        var w=Math.max(1,Math.round(img.width*sc)), h=Math.max(1,Math.round(img.height*sc));
+        cx.drawImage(img,Math.round((size-w)/2),Math.round((size-h)/2),w,h);
+        return cv.toDataURL('image/png');
+      }
+      var i192=mkIcon(192,false), i512=mkIcon(512,false), i512m=mkIcon(512,true);
+      if(!i192||!i512||!i512m) return;
+      var man={
+        name:'Datacom Field Kit', short_name:'Field Kit',
+        start_url:new URL('.',location.href).href, display:'standalone',
+        background_color:'#090d16', theme_color:'#090d16',
+        icons:[
+          {src:i192,sizes:'192x192',type:'image/png'},
+          {src:i512,sizes:'512x512',type:'image/png'},
+          {src:i512m,sizes:'512x512',type:'image/png',purpose:'maskable'}
+        ]};
+      var url=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/json'}));
+      var old=document.querySelector('link[rel="manifest"]');
+      if(old) old.remove();
+      var l=document.createElement('link'); l.rel='manifest'; l.href=url;
+      document.head.appendChild(l);
+      window.__fkBrandManifestUrl=url;
+    }catch(e){}
+  };
+  img.src=c.logo;
+}
+
 /* ---------- auth ---------- */
 function bootAuth(){
   if(!sbReady){ render(); return; }
@@ -3749,8 +3852,7 @@ function renderLogin(){
   $('tabbar').style.display='none';
   var tb=$('timerbar'); tb.style.display='none'; tb.innerHTML='';
   $('app').innerHTML='<div class="card" style="max-width:420px;margin:48px auto">'
-    +'<div style="text-align:center;margin-bottom:18px"><h2 style="margin:0 0 6px">Field Kit</h2>'
-    +'<p class="mut" style="margin:0">Sign in to load your projects</p></div>'
+    +'<div id="loginBrand" style="text-align:center;margin-bottom:18px">'+fkBrandHTML()+'</div>'
     +'<div id="login_err"></div>'
     +'<label class="mut" style="font-size:.8rem">Email</label>'
     +'<input id="li_email" type="email" autocomplete="username" style="width:100%;margin:4px 0 10px">'
@@ -4812,6 +4914,7 @@ function removeMember(uid2){
 
 /* ============ init ============ */
 initSupabase();
+loadCompanyBrand();
 (function(){
   /* the Dashboard is the default landing view on every load (v4.3) */
   view={name:'dashboard'};delete view.id;curTab='overview';
