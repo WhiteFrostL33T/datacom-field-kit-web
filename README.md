@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v5.10
+**Current version:** v5.11
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v5.11** — Design polish aligned with Field Kit Manage: tint status badges, uppercase form labels, dialog shadows restored; one red button style retired
 
 - **v5.10** — Admin area removed (users, cable options, recycle bin and repairs now live in Field Kit Manage) and the Live Tech Radar retired with it. Install app added to the three-dot menu on phones, and cable option lists now load at sign-in for everyone.
 
