@@ -511,6 +511,8 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
   transition:background .15s ease;
 }
 .hdrmenu .cmenu button:hover{background:rgba(255,255,255,0.06);}
+#hdrMenu button.fk-installed{opacity:.55;cursor:default;}
+#hdrMenu button.fk-installed:hover{background:transparent;}
 
 #deskSide{display:none;}
 .deskonly,.deskflex{display:none;}
@@ -533,13 +535,6 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
 }
 
 .secgrid{display:flex;flex-direction:column;gap:14px;}
-.admin-col{display:flex;flex-direction:column;gap:14px;}
-.admin-col .card{margin:0;}
-@media (max-width:1023px){
-  .admin-col-users{order:1;}
-  .admin-col-projects{order:2;}
-  .admin-col-cable{order:3;}
-}
 
 @media (min-width:1024px){
   header{
@@ -807,88 +802,6 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
   animation:cmdPop .15s ease-out;
 }
 
-/* --- Live Tech Radar --- */
-.live-radar-card{
-  background:linear-gradient(180deg, rgba(16,185,129,0.06) 0%, rgba(15,21,35,0.7) 100%);
-  border:1px solid rgba(16,185,129,0.22);border-radius:20px;padding:18px;
-  margin-bottom:16px;position:relative;overflow:hidden;
-}
-.radar-header{
-  display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;
-}
-.radar-beacon{
-  width:12px;height:12px;border-radius:50%;background:#10b981;position:relative;flex:0 0 auto;
-}
-.radar-beacon.pulse:after{
-  content:'';position:absolute;inset:-4px;border-radius:50%;
-  border:2px solid #10b981;animation:radarPing 2s infinite cubic-bezier(0,0,0.2,1);
-}
-.radar-beacon.standby{background:#64748b;}
-@keyframes radarPing{0%{transform:scale(0.8);opacity:1;}100%{transform:scale(2.2);opacity:0;}}
-.radar-sub-tag{
-  font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;padding:2px 7px;
-  border-radius:6px;background:rgba(16,185,129,0.15);color:#6ee7b7;border:1px solid rgba(16,185,129,0.3);font-weight:700;
-}
-.radar-status-badge{
-  display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;padding:5px 12px;
-  border-radius:999px;user-select:none;
-}
-.radar-status-badge.active{
-  background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;
-}
-.radar-status-badge.standby{
-  background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.25);color:#94a3b8;
-}
-.radar-status-dot{width:7px;height:7px;border-radius:50%;}
-.radar-status-dot.green{background:#10b981;box-shadow:0 0 6px #10b981;}
-.radar-status-dot.gray{background:#64748b;}
-
-.radar-standby-box{
-  display:flex;align-items:center;gap:18px;padding:8px 4px;
-}
-.radar-scope-visual{
-  width:84px;height:84px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
-}
-.radar-scope-svg{width:100%;height:100%;}
-.radar-sweep-line{
-  transform-origin:50px 50px;animation:radarSweep 4s linear infinite;
-}
-@keyframes radarSweep{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
-
-.radar-tech-grid{
-  display:grid;grid-template-columns:repeat(auto-fill, minmax(290px, 1fr));gap:12px;
-}
-.radar-card-item{
-  background:rgba(8,11,18,0.7);border:1px solid var(--line);border-radius:16px;
-  padding:14px;display:flex;flex-direction:column;gap:10px;transition:all .18s;
-}
-.radar-card-item:hover{
-  border-color:rgba(16,185,129,0.35);transform:translateY(-1px);
-}
-.radar-avatar{
-  width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
-  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.88rem;color:#fff;
-  position:relative;flex:0 0 auto;box-shadow:0 2px 8px rgba(0,0,0,0.3);
-}
-.radar-avatar.online:after{
-  content:'';position:absolute;bottom:0;right:0;width:10px;height:10px;border-radius:50%;
-  background:#10b981;border:2px solid #0c101a;box-shadow:0 0 6px #10b981;
-}
-.radar-you-badge{
-  background:rgba(99,102,241,0.25);color:#c7d2fe;font-size:.65rem;font-weight:700;
-  padding:1px 6px;border-radius:4px;border:1px solid rgba(99,102,241,0.4);
-}
-.radar-proj-link{
-  background:none;border:none;color:var(--text);font-weight:600;font-size:.84rem;
-  padding:0;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;
-}
-.radar-proj-link:hover{color:var(--accent-light);}
-.radar-live-timer{
-  display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;
-  font-size:.92rem;font-weight:700;color:#6ee7b7;flex:0 0 auto;
-}
-.live-dot{width:6px;height:6px;border-radius:50%;background:#10b981;}
-.live-dot.pulse{animation:pulseGlow 1.5s infinite;}
   /* v5.4 UI polish: one accent, pill status, skeletons, dialog + motion. */
   .card h3{font-size:1.05rem;font-weight:700;letter-spacing:.2px;}
   .card{padding:16px;}
@@ -1012,7 +925,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.9.1';
+var APP_VERSION='5.10';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1123,47 +1036,7 @@ function loadCableOptions(){
       (r.data||[]).forEach(function(row){ if(row.kind==='type') t.push(row.value); else if(row.kind==='color') c.push(row.value); });
       cableOpts={ types:t.length?t:null, colors:c.length?c:null };
     }
-    if(view.name==='admin') render();
-  },function(){ cableOptsMissing=true; cableOpts=null; if(view.name==='admin') render(); });
-}
-function applyCableList(kind,list,hadFullLoad){
-  // The server just confirmed this exact list: adopt it immediately instead
-  // of refetching. The old refetch left a stale window (the toast fired
-  // before it landed) and only re-rendered the Admin view, so project
-  // dropdowns kept the previous list until a later re-render.
-  if(!cableOpts) cableOpts={types:null,colors:null};
-  if(kind==='type') cableOpts.types=list.length?list.slice():null;
-  else cableOpts.colors=list.length?list.slice():null;
-  cableOptsMissing=false;
-  if(hadFullLoad){ cableOptsLoaded=true; render(); }
-  else { cableOptsLoaded=false; loadCableOptions(); }
-}
-function saveCableList(kind,list,msg){
-  var hadFullLoad=cableOptsLoaded&&!!cableOpts;
-  sb.from('cable_options').delete().eq('kind',kind).then(function(){
-    var rows=list.map(function(x){return {kind:kind,value:x};});
-    if(!rows.length){ applyCableList(kind,[],hadFullLoad); toast(msg); return; }
-    sb.from('cable_options').insert(rows).then(function(r){
-      if(r.error){ toast('Could not save cable options: '+r.error.message); return; }
-      applyCableList(kind,list,hadFullLoad); toast(msg);
-    },function(){ toast('Could not save cable options: network error'); });
-  },function(){ toast('Could not save cable options: network error'); });
-}
-function addCableOption(kind){
-  if(!sb){ toast('Connect to the server first'); return; }
-  var v=(val('co_new_'+kind)||'').trim(); if(!v){ toast('Type a new option first'); return; }
-  var cur=kind==='type'?cableTypeList():cableColorList();
-  if(cur.indexOf(v)>=0){ toast('Already in the list'); return; }
-  saveCableList(kind,cur.concat([v]),'Option added');
-}
-function removeCableOption(kind,idx){
-  if(!sb){ toast('Connect to the server first'); return; }
-  var cur=kind==='type'?cableTypeList():cableColorList();
-  if(cur.length<=1){ toast('Keep at least one option'); return; }
-  var value=cur[idx];
-  if(!confirm('Remove "'+value+'" from the list? Past pulls keep it.')) return;
-  var next=cur.filter(function(x,i){return i!==idx;});
-  saveCableList(kind,next,'Option removed');
+  },function(){ cableOptsMissing=true; cableOpts=null; });
 }
 function dayLabel(key){ var y=+key.slice(0,4),m=+key.slice(5,7)-1,d=+key.slice(8,10);
   var dt=new Date(y,m,d);
@@ -1196,6 +1069,50 @@ function fallbackCopy(text){var ta=document.createElement('textarea');ta.value=t
   ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
   try{document.execCommand('copy');toast('Copied');}catch(e){toast('Copy failed — long-press the text');}
   ta.remove();}
+/* ============ install app (v5.10) ============
+   Mobile only: an "Install app" row in the header menu. The browser
+   prompt is captured at startup (beforeinstallprompt fires early);
+   iPhones get Share-sheet instructions instead, and once the app runs
+   installed the row reads "App installed". Mirrors Field Kit Manage. */
+var fkDeferredInstall=null, fkAppInstalled=false;
+function fkIsStandalone(){ return fkAppInstalled||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true; }
+function fkIsMobileChrome(){ return !!(window.matchMedia&&window.matchMedia('(max-width:1023px)').matches); }
+window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); fkDeferredInstall=e; });
+window.addEventListener('appinstalled',function(){ fkAppInstalled=true; fkDeferredInstall=null; renderHdrMenu(); });
+function fkInstallIsIOS(){ var ua=window.navigator.userAgent||''; return /iphone|ipad|ipod/i.test(ua)||(ua.indexOf('Macintosh')>=0&&'ontouchend' in document); }
+function fkInstallClick(){
+  if(fkIsStandalone()) return;
+  toggleHdrMenu();
+  if(fkDeferredInstall){
+    var p=fkDeferredInstall; fkDeferredInstall=null;
+    p.prompt();
+    if(p.userChoice&&p.userChoice.then) p.userChoice.then(function(){},function(){});
+    return;
+  }
+  fkOpenInstallHelp();
+}
+function fkOpenInstallHelp(){
+  closeFkInstallHelp();
+  var h='<div class="cardhd"><h3>Install Field Kit</h3><button class="dlg-x" aria-label="Close" onclick="closeFkInstallHelp()">\u00d7</button></div>';
+  if(fkInstallIsIOS()){
+    h+='<p class="mut" style="margin:2px 0 0">Add Field Kit to your home screen and it opens full-screen, from its own icon:</p>'
+      +'<p style="margin:12px 0 0">1. Tap the <b>Share</b> button in your browser.</p>'
+      +'<p style="margin:4px 0 0">2. Choose <b>Add to Home Screen</b>.</p>'
+      +'<p style="margin:4px 0 0">3. Tap <b>Add</b>. Done \u2014 the Field Kit icon is on your home screen.</p>';
+  } else {
+    h+='<p class="mut" style="margin:2px 0 0">Your browser did not offer its install prompt here, but you can install Field Kit from the browser menu:</p>'
+      +'<p style="margin:12px 0 0">1. Open your <b>browser menu</b>.</p>'
+      +'<p style="margin:4px 0 0">2. Choose <b>Install app</b> or <b>Add to Home screen</b>.</p>'
+      +'<p style="margin:4px 0 0">3. Confirm \u2014 Field Kit then opens full-screen, from its own icon.</p>';
+  }
+  h+='<button class="btn" style="width:100%;margin-top:14px" onclick="closeFkInstallHelp()">Done</button>';
+  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='fkInstallDlg';
+  ov.innerHTML='<div class="dlg">'+h+'</div>';
+  ov.addEventListener('click',function(e){ if(e.target===ov) closeFkInstallHelp(); });
+  document.body.appendChild(ov);
+}
+function closeFkInstallHelp(){ var o=document.getElementById('fkInstallDlg'); if(o) o.remove(); }
+
 /* ============ routing ============ */
 var view={name:'dashboard'};
 var curTab='overview';
@@ -1205,7 +1122,6 @@ function goActivity(){view={name:'activity'};render();}
 function goDashboard(){view={name:'dashboard'};render();}
 function goBackup(){view={name:'backup'};render();}
 function goAbout(){view={name:'about'};render();}
-function goAdmin(){view={name:'admin'};render();}
 function openProject(id){view={name:'project',id:id};curTab='overview';render();}
 function setTab(t){curTab=t;render();}
 $('btnMore').addEventListener('click',function(e){e.stopPropagation();toggleHdrMenu();});
@@ -1247,8 +1163,6 @@ function renderBreadcrumb(){
     h+='<span class="bc-sep">/</span><span class="bc-item bc-current">Backup / Restore</span>';
   } else if(view.name==='about'){
     h+='<span class="bc-sep">/</span><span class="bc-item bc-current">About</span>';
-  } else if(view.name==='admin'){
-    h+='<span class="bc-sep">/</span><span class="bc-item bc-current">Admin Console</span>';
   } else if(view.name==='project'){
     var p=projById(view.id);
     var pName=p?p.name:'Project';
@@ -1413,7 +1327,7 @@ function filterCmdPalette(q){
 
   // 4. Navigation
   var navItems=[
-    {id:'dashboard',title:'Dashboard',sub:'Overview & Live Tech Radar',action:goDashboard},
+    {id:'dashboard',title:'Dashboard',sub:'Overview & stats',action:goDashboard},
     {id:'projects',title:'Projects',sub:'All active & closed jobs',action:goProjects},
     {id:'timer',title:'Timer',sub:'Punch clock & active timers',action:goTimer},
     {id:'timesheet',title:'Daily Timesheet',sub:'Review day timeline & logs',action:goTimesheet},
@@ -1421,7 +1335,6 @@ function filterCmdPalette(q){
     {id:'backup',title:'Backup & Restore',sub:'Export/import JSON database',action:goBackup},
     {id:'about',title:'About Field Kit',sub:'Version & changelog',action:goAbout}
   ];
-  if(isAdmin) navItems.push({id:'admin',title:'Admin Console',sub:'Users, permissions & recycle bin',action:goAdmin});
   var navMatches=[];
   navItems.forEach(function(n){
     if(!query || n.title.toLowerCase().indexOf(query)>=0 || n.sub.toLowerCase().indexOf(query)>=0){
@@ -1698,170 +1611,6 @@ function renderSwitchChassis(sw, rows, projectId){
   return { html: h, mode: mode };
 }
 
-/* ============ Live Tech Radar Component ============ */
-var radarTickerInt = null;
-
-function getInitials(name){
-  if(!name) return '??';
-  var clean = name.replace(/\(You\)/i, '').trim();
-  var parts = clean.split(/\s+/);
-  if(parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function formatSecToHMS(sec){
-  var h = Math.floor(sec / 3600);
-  var m = Math.floor((sec % 3600) / 60);
-  var s = sec % 60;
-  var pad = function(n){ return String(n).padStart(2, '0'); };
-  return pad(h) + ':' + pad(m) + ':' + pad(s);
-}
-
-function getActiveCrewTimers(){
-  var list = [];
-  var seenUsers = {};
-  
-  if(data.timer){
-    var myUid = (sbUser && sbUser.id) || 'local_user';
-    var myName = (sbUser && authorLabels[sbUser.id]) ? authorLabels[sbUser.id] + ' (You)' : 'You';
-    var p = projById(data.timer.projectId);
-    list.push({
-      userId: myUid,
-      name: myName,
-      isMe: true,
-      projectId: data.timer.projectId,
-      projectName: p ? p.name : '(Project deleted)',
-      customer: p ? (p.customer || p.site || '') : '',
-      kind: data.timer.kind || 'On site',
-      startISO: data.timer.startISO
-    });
-    seenUsers[myUid] = true;
-  }
-  
-  if(Array.isArray(crewTimers)){
-    crewTimers.forEach(function(t){
-      if(seenUsers[t.user_id]) return;
-      var p = projById(t.project_id);
-      var uName = authorLabels[t.user_id] || 'Teammate';
-      var isMe = sbUser && t.user_id === sbUser.id;
-      if(isMe) uName += ' (You)';
-      list.push({
-        userId: t.user_id,
-        name: uName,
-        isMe: isMe,
-        projectId: t.project_id,
-        projectName: p ? p.name : '(Job site)',
-        customer: p ? (p.customer || p.site || '') : '',
-        kind: t.kind || 'On site',
-        startISO: t.started_at
-      });
-      seenUsers[t.user_id] = true;
-    });
-  }
-  return list;
-}
-
-function liveRadarHTML(){
-  var activeTimers = getActiveCrewTimers();
-  var count = activeTimers.length;
-  
-  var h = '<div class="live-radar-card">';
-  
-  // Header
-  h += '<div class="radar-header">';
-  h += '  <div style="display:flex;align-items:center;gap:10px">';
-  h += '    <div class="radar-beacon '+(count>0?'pulse':'standby')+'"></div>';
-  h += '    <div>';
-  h += '      <h3 style="margin:0;font-size:1.12rem;display:flex;align-items:center;gap:8px">Live Tech Radar';
-  h += '        <span class="radar-sub-tag">Field Ops</span>';
-  h += '      </h3>';
-  h += '      <div class="mut" style="font-size:.76rem">Active field technician timers & job site presence</div>';
-  h += '    </div>';
-  h += '  </div>';
-  h += '  <div class="radar-status-badge '+(count>0?'active':'standby')+'">';
-  h += count > 0 ? ('<span class="radar-status-dot green"></span> ' + count + ' On Site') : ('<span class="radar-status-dot gray"></span> Standby');
-  h += '  </div>';
-  h += '</div>';
-  
-  // Body
-  if(count === 0){
-    h += '<div class="radar-standby-box">';
-    h += '  <div class="radar-scope-visual">';
-    h += '    <svg viewBox="0 0 100 100" class="radar-scope-svg">';
-    h += '      <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(16,185,129,0.15)" stroke-width="1.5" stroke-dasharray="3 3"/>';
-    h += '      <circle cx="50" cy="50" r="32" fill="none" stroke="rgba(16,185,129,0.22)" stroke-width="1.5"/>';
-    h += '      <circle cx="50" cy="50" r="18" fill="none" stroke="rgba(16,185,129,0.3)" stroke-width="1.5"/>';
-    h += '      <line x1="50" y1="4" x2="50" y2="96" stroke="rgba(16,185,129,0.12)" stroke-width="1"/>';
-    h += '      <line x1="4" y1="50" x2="96" y2="50" stroke="rgba(16,185,129,0.12)" stroke-width="1"/>';
-    h += '      <line x1="50" y1="50" x2="82" y2="22" stroke="rgba(16,185,129,0.85)" stroke-width="2" stroke-linecap="round" class="radar-sweep-line"/>';
-    h += '      <circle cx="50" cy="50" r="3" fill="#10b981"/>';
-    h += '    </svg>';
-    h += '  </div>';
-    h += '  <div style="flex:1;min-width:0">';
-    h += '    <div style="font-weight:700;font-size:1.02rem;color:#f1f5f9">All Crew Checked Out</div>';
-    h += '    <div class="mut" style="font-size:.84rem;margin:3px 0 0">No active timers currently running across any field projects. Ready for site dispatch.</div>';
-    h += '  </div>';
-    h += '</div>';
-  } else {
-    h += '<div class="radar-tech-grid">';
-    activeTimers.forEach(function(tech){
-      var initials = getInitials(tech.name);
-      var startTs = new Date(tech.startISO).getTime();
-      var elapsedSec = Math.max(0, Math.floor((Date.now() - startTs) / 1000));
-      var clockStr = formatSecToHMS(elapsedSec);
-      
-      h += '<div class="radar-card-item">';
-      h += '  <div style="display:flex;align-items:center;gap:12px">';
-      h += '    <div class="radar-avatar online">'+esc(initials)+'</div>';
-      h += '    <div style="flex:1;min-width:0">';
-      h += '      <div style="font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:6px">';
-      h += '        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(tech.name)+'</span>';
-      if(tech.isMe) h += ' <span class="radar-you-badge">YOU</span>';
-      h += '      </div>';
-      h += '      <div class="mut" style="font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">';
-      h += esc(tech.kind);
-      if(tech.customer) h += ' · ' + esc(tech.customer);
-      h += '      </div>';
-      h += '    </div>';
-      h += '  </div>';
-      
-      h += '  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.06);margin-top:2px">';
-      h += '    <button class="radar-proj-link" onclick="openProject(\''+tech.projectId+'\')" title="Jump to '+esc(tech.projectName)+'">';
-      h += '      🏢 <span style="text-decoration:underline">'+esc(tech.projectName)+'</span>';
-      h += '    </button>';
-      h += '    <div class="radar-live-timer" data-start-iso="'+tech.startISO+'">';
-      h += '      <span class="live-dot pulse"></span>';
-      h += '      <b class="radar-clock-text">'+clockStr+'</b>';
-      h += '    </div>';
-      h += '  </div>';
-      h += '</div>';
-    });
-    h += '</div>';
-  }
-  
-  h += '</div>';
-  return h;
-}
-
-function updateRadarClocks(){
-  var els = document.querySelectorAll('.radar-live-timer');
-  if(!els.length) return;
-  var now = Date.now();
-  Array.prototype.forEach.call(els, function(el){
-    var iso = el.getAttribute('data-start-iso');
-    if(!iso) return;
-    var t = new Date(iso).getTime();
-    if(isNaN(t)) return;
-    var sec = Math.max(0, Math.floor((now - t) / 1000));
-    var txtEl = el.querySelector('.radar-clock-text');
-    if(txtEl) txtEl.textContent = formatSecToHMS(sec);
-  });
-}
-
-function startRadarTicker(){
-  if(radarTickerInt) clearInterval(radarTickerInt);
-  radarTickerInt = setInterval(updateRadarClocks, 1000);
-}
 function openImportForm(){
   if(view.name!=='projects')goProjects();
   var f=$('importForm');if(f&&f.style.display==='none')toggleImportForm();
@@ -1896,7 +1645,6 @@ function renderDeskSide(){
   nav.forEach(function(n){
     h+='<button class="dsnav'+(view.name===n[0]?' act':'')+'" onclick="'+n[2]+'">'+n[1]+'</button>';
   });
-  if(isAdmin) h+='<button class="dsnav'+(view.name==='admin'?' act':'')+'" onclick="goAdmin()">Admin</button>';
   var act=data.projects.filter(function(p){return (p.status||'active')!=='done';});
   if(act.length){
     h+='<div class="seclbl" style="margin:18px 6px 6px">My projects</div>';
@@ -1924,7 +1672,7 @@ function renderTabBar(){
     }).join('');
     return;
   }
-  var active=(view.name==='backup'||view.name==='about'||view.name==='admin')?null:view.name;
+  var active=(view.name==='backup'||view.name==='about')?null:view.name;
   $('tabbar').innerHTML=TABDEF.map(function(t){
     return '<button class="btab'+(active===t.id?' act':'')+'" onclick="go'+t.label+'()">'+t.icon+'<span>'+t.label+'</span></button>';
   }).join('');
@@ -1945,7 +1693,6 @@ function render(skipTrack){
     view.name==='timesheet'?'Timesheet':
     view.name==='backup'?'Backup / Restore':
     view.name==='about'?'About':
-    view.name==='admin'?'Admin':
     view.name==='notifications'?'Notifications':
     (projById(view.id)?projById(view.id).name:'Project');
   renderBreadcrumb();
@@ -1953,11 +1700,7 @@ function render(skipTrack){
   updateBell();
   renderTimerBar();
   if(view.name==='dashboard'){
-    if(!crewTimersLoaded&&sb&&sbUser){
-      loadCrewTimers().then(function(){ if(view.name==='dashboard'&&!uiBusy()) render(true); });
-    }
     renderDashboard();
-    startRadarTicker();
   }
   else if(view.name==='projects')renderProjects();
   else if(view.name==='timer')renderTimer();
@@ -1966,7 +1709,6 @@ function render(skipTrack){
   else if(view.name==='timesheet')renderTimesheet();
   else if(view.name==='backup')renderBackup();
   else if(view.name==='about')renderAbout();
-  else if(view.name==='admin'){ renderAdmin(); startRadarTicker(); }
   else renderProject();
   if(view.name!=='notifications')notifSnapshot=null;
   renderTabBar();
@@ -2075,13 +1817,11 @@ function loadOwnTimer(){
   }).catch(function(){});
 }
 function onTimerRowChanged(){
-  // Own row changed (started/stopped on another device) or, for admins,
-  // any crew row changed: refetch and update the bar + dashboard block.
+  // Own row changed (started/stopped on another device): refetch and
+  // update the bar + dashboard.
   loadOwnTimer().then(function(){
-    if(isAdmin) return loadCrewTimers();
-  }).then(function(){
     renderTimerBar();
-    if((view.name==='dashboard'||view.name==='admin')&&!uiBusy()) render();
+    if(view.name==='dashboard'&&!uiBusy()) render();
   });
 }
 function startTimer(pid,kind){
@@ -2153,36 +1893,6 @@ function greetParts(){
 }
 function renderDashboard(){
   $('app').innerHTML=dashboardHTML();
-}
-/* ---------- crew (v5.0, admin) ---------- */
-var crewTimers=[], crewTimersLoaded=false;
-function loadCrewTimers(){
-  if(!sb||!sbUser||!isAdmin) return Promise.resolve();
-  crewTimersLoaded=true; // set at fetch start: a failed fetch must not re-trigger on every render
-  return sb.from('running_timers').select('*').then(function(r){
-    if(!r.error&&r.data) crewTimers=r.data;
-  }).catch(function(){});
-}
-function crewAdminHTML(){
-  var h='<div class="card"><div class="cardhd"><h3>Crew</h3></div>';
-  if(!crewTimers.length) h+='<p class="mut">Nobody on the clock right now.</p>';
-  else crewTimers.forEach(function(t){
-    var p=projById(t.project_id);
-    var mins=Math.max(0,Math.floor((Date.now()-new Date(t.started_at).getTime())/60000));
-    h+='<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0"><span><b>'+esc(authorLabels[t.user_id]||'Teammate')+'</b> \u00b7 '+esc(t.kind)+' \u00b7 '+esc(p?p.name:'?')+'</span><span class="mut" style="white-space:nowrap">'+fmtHM(mins)+'</span></div>';
-  });
-  var dow=(new Date().getDay()+6)%7, mon=new Date(); mon.setDate(mon.getDate()-dow);
-  var weekKeys={};
-  for(var i=0;i<7;i++){ var d=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i); weekKeys[dayOfTs(d.getTime())]=1; }
-  var byUser={};
-  data.timeEntries.forEach(function(e){
-    if(e.startISO&&weekKeys[e.startISO.slice(0,10)]) byUser[e.userId||'']=(byUser[e.userId||'']||0)+entryMinutes(e);
-  });
-  h+='<div class="seclbl">Hours this week</div>';
-  Object.keys(byUser).forEach(function(uid){
-    h+='<div style="display:flex;justify-content:space-between;padding:6px 0"><span>'+esc(authorLabels[uid]||(sbUser&&uid===sbUser.id?'You':'Teammate'))+'</span><b>'+fmtHM(byUser[uid])+'</b></div>';
-  });
-  return h+'</div>';
 }
 function dashboardHTML(){
   var now=new Date();
@@ -3525,6 +3235,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.10',items:['The Admin area has been removed — users, cable options, the recycle bin and project repairs now live in Field Kit Manage','The Live Tech Radar retired along with it','New on phones: Install app in the three-dot menu — add Field Kit to your home screen from inside the app','Cable type and color lists now load at sign-in, so edits made in Manage reach the app on their own']},
  {v:'5.9.1',items:['On desktop, your company name and logo (set in Field Kit Manage) now take over the sidebar and header branding \u2014 the phone layout is unchanged']},
  {v:'5.9',items:['Your company name and logo (set in Field Kit Manage) now show on the sign-in screen, and the logo becomes the app icon when Field Kit is installed']},
  {v:'5.8.1',items:['Recent activity now shows start and end times for time entries (for example 10:15\u201311:00 AM) instead of just the start time']},
@@ -3637,6 +3348,7 @@ function trackNav(push){
 }
 window.addEventListener('popstate',function(e){
   var s=e.state;
+  if(s&&s.v==='admin') s=null; // v5.10: Admin is gone — old history entries land on Dashboard
   if(s&&s.v){view={name:s.v};if(s.id)view.id=s.id;else delete view.id;curTab=s.tab||'overview';}
   else{view={name:'dashboard'};delete view.id;curTab='overview';}
   render(true);
@@ -3669,7 +3381,6 @@ function initSupabase(){
    fetch refreshes it. Any failure leaves the stock v5.8.1 behaviour. */
 var FK_CO_KEY='fk_company_v1';
 var fkCompany=null; /* null = unknown yet; {name,logo} once cache/fetch lands ('' = none set) */
-var fkIconsTried=false;
 function fkCoCache(){
   try{
     var raw=localStorage.getItem(FK_CO_KEY);
@@ -3711,7 +3422,6 @@ function fkCoApply(){
     renderBreadcrumb();
     renderDeskSide();
   }catch(e){}
-  if(c&&c.logo) fkBrandIcons();
 }
 function loadCompanyBrand(){
   var cached=fkCoCache();
@@ -3728,49 +3438,6 @@ function loadCompanyBrand(){
     },function(){ /* network failure: keep the cached state */ });
   }catch(e){}
 }
-/* Install icons from the company logo (best effort): build 192/512 + a
-   padded maskable 512 on canvas and swap in a generated manifest that
-   mirrors the shipped static one (same name/short_name/colours). With no
-   logo set, the stock manifest and icons are left exactly as shipped. */
-function fkBrandIcons(){
-  if(fkIconsTried) return; fkIconsTried=true;
-  var c=fkCompany; if(!c||!c.logo) return;
-  var img=new Image();
-  img.onload=function(){
-    try{
-      function mkIcon(size,maskable){
-        var cv=document.createElement('canvas'); cv.width=size; cv.height=size;
-        var cx=cv.getContext('2d'); if(!cx) return null;
-        if(maskable){ cx.fillStyle='#090d16'; cx.fillRect(0,0,size,size); }
-        var target=maskable?size*0.8:size;
-        var sc=Math.min(target/img.width,target/img.height);
-        if(!(sc>0)) return null;
-        var w=Math.max(1,Math.round(img.width*sc)), h=Math.max(1,Math.round(img.height*sc));
-        cx.drawImage(img,Math.round((size-w)/2),Math.round((size-h)/2),w,h);
-        return cv.toDataURL('image/png');
-      }
-      var i192=mkIcon(192,false), i512=mkIcon(512,false), i512m=mkIcon(512,true);
-      if(!i192||!i512||!i512m) return;
-      var man={
-        name:'Datacom Field Kit', short_name:'Field Kit',
-        start_url:new URL('.',location.href).href, display:'standalone',
-        background_color:'#090d16', theme_color:'#090d16',
-        icons:[
-          {src:i192,sizes:'192x192',type:'image/png'},
-          {src:i512,sizes:'512x512',type:'image/png'},
-          {src:i512m,sizes:'512x512',type:'image/png',purpose:'maskable'}
-        ]};
-      var url=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/json'}));
-      var old=document.querySelector('link[rel="manifest"]');
-      if(old) old.remove();
-      var l=document.createElement('link'); l.rel='manifest'; l.href=url;
-      document.head.appendChild(l);
-      window.__fkBrandManifestUrl=url;
-    }catch(e){}
-  };
-  img.src=c.logo;
-}
-
 /* ---------- auth ---------- */
 function bootAuth(){
   if(!sbReady){ render(); return; }
@@ -3779,6 +3446,7 @@ function bootAuth(){
   sb.auth.getSession().then(function(r){
     if(r.data&&r.data.session){
       if(pendingView&&pendingView.name&&pendingView.name!=='login'){
+        if(pendingView.name==='admin') pendingView={name:'dashboard'}; // v5.10: Admin is gone
         view={name:pendingView.name}; if(pendingView.id)view.id=pendingView.id;
         curTab=pendingView.tab||'overview';
       }
@@ -3795,7 +3463,7 @@ function bootAuth(){
 
 function onSignedIn(session,keepView){
   sbUser=session.user;
-  checkAdmin();
+  loadCableOptions();
   if(!keepView){ view={name:'dashboard'}; curTab='overview'; }
   else if(view.name==='login'){ view={name:'dashboard'}; }
   $('app').innerHTML=loadingHTML();
@@ -3813,7 +3481,6 @@ function initialLoad(){
   setSyncStatus('refreshing');
   migrateLocalOnce().then(function(){ return fetchAllFromServer(); }).then(function(){
     var jobs=[loadPrefs(),loadOwnTimer()];
-    if(isAdmin) jobs.push(loadCrewTimers());
     return Promise.all(jobs);
   }).then(function(){
     setSyncStatus('ok');
@@ -3854,9 +3521,8 @@ function renderOffline(){
 }
 function onSignedOut(){
   memberCache={};
-  isAdmin=false; adminCheckedFor=null; adminData=null;
   sbUser=null;
-  data=defaultData(); serverSnap=null; crewTimers=[];
+  data=defaultData(); serverSnap=null;
   try{localStorage.removeItem('fk_data_v1');localStorage.removeItem('fk_sync_meta');localStorage.removeItem('fk_sync_snap');localStorage.removeItem('fk_view');localStorage.removeItem('fk_cached_data_v5');}catch(e){}
   if(rtChannel){ try{sb.removeChannel(rtChannel);}catch(e){} rtChannel=null; }
   if(refreshTimer){clearTimeout(refreshTimer);refreshTimer=null;}
@@ -4441,309 +4107,6 @@ function runDiag(){
   });
 }
 
-/* ---------- admin (v4.0) ---------- */
-var isAdmin=false, adminCheckedFor=null, adminData=null, adminNameEdit=null;
-function checkAdmin(){
-  if(!sb||!sbUser){ isAdmin=false; return; }
-  if(adminCheckedFor===sbUser.id) return;
-  adminCheckedFor=sbUser.id;
-  sb.from('admins').select('user_id').eq('user_id',sbUser.id).maybeSingle().then(function(r){
-    isAdmin=!!(r&&r.data&&r.data.user_id);
-    renderHdrMenu();
-    if(isAdmin){ loadCrewTimers().then(function(){ if((view.name==='dashboard'||view.name==='admin')&&!uiBusy()) render(); }); }
-  },function(){ isAdmin=false; });
-}
-function loadAdminData(force){
-  if(!sb||!sbUser) return;
-  if(adminData&&adminData.loading) return;
-  if(adminData&&!adminData.error&&!force) return;
-  adminData={loading:true};
-  Promise.all([
-    profilesQ(null,false),
-    sb.from('admins').select('user_id'),
-    sb.from('project_members').select('project_id,user_id'),
-    sb.from('projects').select('id,name,owner_id,deleted_at,created_at')
-  ]).then(function(rs){
-    if(rs[0].error){ adminData={error:(rs[0].error.message||'Could not load admin data')}; if(view.name==='admin')render(); return; }
-    adminData={ profiles:rs[0].data||[],
-      admins:(rs[1].data||[]).map(function(a){return a.user_id;}),
-      members:rs[2].data||[], projects:rs[3].data||[] };
-    if(view.name==='admin')render();
-  },function(){ adminData={error:'Could not load admin data'}; if(view.name==='admin')render(); });
-}
-function adminFn(action,payload,doneMsg){
-  var body={action:action};
-  for(var k in payload) body[k]=payload[k];
-  sb.functions.invoke('admin',{body:body}).then(function(r){
-    if(r.error){ toast('Admin action failed: '+(r.error.message||'function error')); return; }
-    if(r.data&&r.data.error){ toast('Admin action failed: '+r.data.error); return; }
-    toast(doneMsg||'Done');
-    adminData=null;
-    if(action==='setAdmin'){ adminCheckedFor=null; checkAdmin(); }
-    if(view.name==='admin')render();
-  },function(){ toast('Admin action failed: network error'); });
-}
-function renderAdmin(){
-  if(!isAdmin){ $('app').innerHTML='<div class="card"><p class="mut">Admins only.</p></div>'; return; }
-  loadAdminData();
-  if(!cableOptsLoaded&&sb){ loadCableOptions(); }
-  if(!crewTimersLoaded&&sb){ loadCrewTimers().then(function(){ if(view.name==='admin'&&!uiBusy()) render(); }); }
-  if(!adminData||adminData.loading){ $('app').innerHTML='<div class="card"><p class="mut">Loading admin data\u2026</p></div>'; return; }
-  if(adminData.error){
-    $('app').innerHTML='<div class="card"><h3>Admin</h3><div class="err">'+esc(adminData.error)+'</div>'
-      +'<p class="mut">If the admins table does not exist yet, run the v4.0 migration SQL in Supabase (SQL Editor) \u2014 it creates the table, the oversight policies, and makes you the first admin.</p></div>';
-    return;
-  }
-  var d=adminData;
-  var labelOf=function(id){ var pr=d.profiles.filter(function(x){return x.id===id;})[0];
-    return pr?profLabel(pr):(sbUser&&id===sbUser.id?sbUser.email:String(id).slice(0,8)+'\u2026'); };
-  var h='<div style="margin:4px 2px 12px"><div style="font-size:1.55rem;font-weight:800">Admin</div>'
-    +'<div class="mut">Users, projects and repairs \u2014 visible only to admins.</div></div>';
-  var actProjs=d.projects.filter(function(p){return !p.deleted_at&&(p.status||'active')!=='done';});
-  var delProjs=d.projects.filter(function(p){return !!p.deleted_at;});
-  h+='<div class="statgrid">'
-    +'<div class="stat"><b>'+d.profiles.length+'</b><span>Users</span></div>'
-    +'<div class="stat"><b>'+actProjs.length+'</b><span>Active projects</span></div>'
-    +'<div class="stat hot"><b>'+crewTimers.length+'</b><span>On the clock</span></div>'
-    +'<button class="stat warn" onclick="openBinDialog()"><b>'+delProjs.length+'</b><span>In recycle bin \u203a</span></button>'
-    +'</div>';
-  h+=liveRadarHTML();
-  h+='<div class="secgrid">';
-  h+='<div class="seccol">'+cableOptionsHTML()+'</div>';
-  h+='<div class="seccol">'+crewAdminHTML();
-  h+='<div class="card"><h3>Users ('+d.profiles.length+')</h3>';
-  d.profiles.forEach(function(pr){
-    var adm=d.admins.indexOf(pr.id)>=0;
-    var owned=d.projects.filter(function(x){return x.owner_id===pr.id;}).length;
-    var memb=d.members.filter(function(x){return x.user_id===pr.id;}).length;
-    var nm=(pr.display_name||'').trim();
-    h+='<div class="kv"><span>'+(nm?('<b>'+esc(nm)+'</b>'):esc(pr.email))+(sbUser&&pr.id===sbUser.id?' (you)':'')
-      +'<div class="mut" style="font-size:.76rem">'+(nm?esc(pr.email)+' \u00b7 ':'')+'owns '+owned+' \u00b7 member of '+memb+'</div></span>'
-      +'<span style="display:flex;gap:6px;align-items:center;flex:0 0 auto">'
-      +(adm?tbadge('admin','#1d5c96'):'')
-      +'<span class="cardmenu"><button class="iconbtn" aria-label="User actions" onclick="event.stopPropagation();toggleAdminMenu(\'u-'+pr.id+'\')">&#8942;</button>'
-      +'<span class="cmenu" id="amenu-u-'+pr.id+'" style="display:none">'
-      +'<button onclick="adminEditName(\''+pr.id+'\')">'+(nm?'Edit name':'Set name')+'</button>'
-      +(adm
-        ?'<button onclick="adminSetAdmin(\''+pr.id+'\',false)">Remove admin</button>'
-        :'<button onclick="adminSetAdmin(\''+pr.id+'\',true)">Make admin</button>')
-      +'</span></span></span></div>';
-    if(adminNameEdit===pr.id){
-      h+='<div style="display:flex;gap:6px;align-items:center;padding:2px 0 10px">'
-        +'<input id="ad_name_'+pr.id+'" value="'+esc(nm)+'" placeholder="Display name (blank clears it)" style="flex:1;margin:0">'
-        +'<button class="btn sml" onclick="adminSaveName(\''+pr.id+'\')">Save</button>'
-        +'<button class="btn sec sml" onclick="adminCancelName()">Cancel</button></div>';
-    }
-  });
-  h+='</div></div>';
-  h+='<div class="seccol"><div class="card"><h3>Projects ('+actProjs.length+')</h3>';
-  actProjs.slice().sort(function(a,b){return String(b.created_at||'')<String(a.created_at||'')?-1:1;}).forEach(function(pr){
-    var mem=d.members.filter(function(x){return x.project_id===pr.id;});
-    h+='<div style="padding:5px 0;border-bottom:1px solid var(--line)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>'+esc(pr.name)+'</b>'
-      +'<span class="cardmenu" style="margin-left:auto"><button class="iconbtn" aria-label="Project actions" onclick="event.stopPropagation();toggleAdminMenu(\'p-'+pr.id+'\')">&#8942;</button>'
-      +'<span class="cmenu" id="amenu-p-'+pr.id+'" style="display:none">'
-      +'<button onclick="openMembersDialog(\''+pr.id+'\')">Members…</button>'
-      +'<button class="danger" onclick="adminPurgeConfirm(\''+pr.id+'\')">Delete permanently</button>'
-      +'</span></span>'
-      +'</div>'
-      +'<div class="mut" style="font-size:.8rem">owner '+esc(labelOf(pr.owner_id))+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</div>'
-      +'</div>';
-  });
-  h+='</div></div>';
-  h+='</div>';
-  h+='<div style="height:80px"></div>';
-  h+='<button class="fab" onclick="openCreateUser()" aria-label="Create user">+</button>';
-  $('app').innerHTML=h;
-}
-function cableOptionsHTML(){
-  var h='<div class="card"><h3>Cable options</h3>';
-  if(cableOptsMissing) h+='<p class="mut">The cable_options table is not set up yet — run the v5.2 migration SQL in Supabase, then these lists become editable. Showing the built-in lists for now.</p>';
-  else h+='<p class="mut">What shows in the cable pull dropdowns. Removing an option never changes past pulls.</p>';
-  var groups=[['type','Types',cableTypeList()],['color','Colors',cableColorList()]];
-  groups.forEach(function(g){
-    h+='<div class="seclbl">'+g[1]+'</div>';
-    g[2].forEach(function(v,i){
-      h+='<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)"><span style="flex:1">'+esc(v)+'</span>';
-      if(!cableOptsMissing) h+='<span class="cardmenu"><button class="iconbtn" aria-label="Option actions" onclick="event.stopPropagation();toggleAdminMenu(\''+g[0]+'-'+i+'\')">&#8942;</button>'
-        +'<span class="cmenu" id="amenu-'+g[0]+'-'+i+'" style="display:none">'
-        +'<button class="danger" onclick="removeCableOption(\''+g[0]+'\','+i+')">Remove</button></span></span>';
-      h+='</div>';
-    });
-    if(!cableOptsMissing) h+='<div style="display:flex;gap:8px;margin-top:10px">'
-      +'<input id="co_new_'+g[0]+'" placeholder="New '+g[1].toLowerCase().slice(0,-1)+'…" style="flex:1;margin:0">'
-      +'<button class="btn" style="flex:0 0 auto;width:auto;min-height:40px;padding:8px 16px" onclick="addCableOption(\''+g[0]+'\')">Add</button></div>';
-  });
-  return h+'</div>';
-}
-function openMembersDialog(pid){
-  closeMembersDialog();
-  var d=adminData||{projects:[],members:[],profiles:[]};
-  var pr=d.projects.filter(function(x){return x.id===pid;})[0]; if(!pr) return;
-  var memIds=d.members.filter(function(m){return m.project_id===pid;}).map(function(m){return m.user_id;});
-  var labelOf=function(id){ var x=d.profiles.filter(function(y){return y.id===id;})[0]; return x?profLabel(x):String(id).slice(0,8)+'…'; };
-  var rows=memIds.length?memIds.map(function(uid){
-    return '<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0"><b>'+esc(labelOf(uid))+'</b></span>'
-      +'<button class="btn sec" style="flex:none;width:auto;min-height:36px;padding:8px 14px;" onclick="closeMembersDialog();adminRemoveMember(\''+pid+'\',\''+uid+'\')">Remove</button></div>';
-  }).join(''):'<p class="mut">Nobody on this project yet.</p>';
-  var cands=d.profiles.filter(function(p){return memIds.indexOf(p.id)<0;});
-  var addRow=cands.length?'<p class="mut" style="margin:12px 0 8px">Add someone already on the team:</p>'
-    +'<div style="display:flex;gap:8px"><select id="md_add" style="flex:1;margin:0">'
-    +cands.map(function(p){return '<option value="'+p.id+'">'+esc(profLabel(p))+'</option>';}).join('')
-    +'</select><button class="btn" style="flex:0 0 auto;width:auto;min-height:40px;padding:8px 16px" onclick="closeMembersDialog();adminAddMember(\''+pid+'\',val(\'md_add\'))">Add</button></div>'
-    :'<p class="mut" style="margin:12px 0 8px">Everyone is already on this project.</p>';
-  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='memDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Members</h3><button class="dlg-x" aria-label="Close" onclick="closeMembersDialog()">\u00d7</button></div>'
-    +'<p class="mut" style="margin:0 0 8px">'+esc(pr.name)+'</p>'+rows+addRow
-    +'<button class="btn" style="width:100%;margin-top:12px" onclick="closeMembersDialog()">Done</button></div>';
-  ov.addEventListener('click',function(e){ if(e.target===ov) closeMembersDialog(); });
-  document.body.appendChild(ov);
-}
-function closeMembersDialog(){ var o=document.getElementById('memDlg'); if(o) o.remove(); }
-function adminAddMember(pid,uid){ if(!uid) return; adminFn('addMembership',{projectId:pid,userId:uid},'Member added'); }
-function openBinDialog(){
-  closeBinDialog();
-  var d=adminData||{projects:[]};
-  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var shortD=function(ts){var x=new Date(ts);return MON[x.getMonth()]+' '+x.getDate();};
-  var del=d.projects.filter(function(p){return !!p.deleted_at;})
-    .slice().sort(function(a,b){return new Date(b.deleted_at)-new Date(a.deleted_at);});
-  var rows=del.length?del.map(function(pr){
-    var until=new Date(new Date(pr.deleted_at).getTime()+30*864e5);
-    return '<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0"><b>'+esc(pr.name)+'</b>'
-      +'<div class="mut" style="font-size:.8rem">Deleted '+esc(shortD(pr.deleted_at))+' \u00b7 restorable until '+esc(shortD(until))+'</div></span>'
-      +'<button class="btn" style="flex:none;width:auto;min-height:36px;padding:8px 14px;" onclick="binRestore(\''+pr.id+'\')">Restore</button></div>';
-  }).join(''):'<p class="mut">Nothing in the recycle bin.</p>';
-  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='binDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Recycle bin</h3>'
-    +'<span class="tbadge" style="background:#a33333">'+del.length+' deleted</span><button class="dlg-x" aria-label="Close" onclick="closeBinDialog()">\u00d7</button></div>'
-    +rows
-    +'<p class="mut" style="margin:10px 0">Deleted projects stay restorable for 30 days. Restore brings back the project and everything deleted with it.</p>'
-    +(del.length?'<button class="btn sec" style="width:100%" onclick="binPurge()">Delete permanently everything deleted 30+ days ago</button>':'')
-    +'<button class="btn" style="width:100%;margin-top:12px" onclick="closeBinDialog()">Done</button></div>';
-  ov.addEventListener('click',function(e){ if(e.target===ov) closeBinDialog(); });
-  document.body.appendChild(ov);
-}
-function closeBinDialog(){ var o=document.getElementById('binDlg'); if(o) o.remove(); }
-function binRestore(pid){ closeBinDialog(); adminRestoreProject(pid); }
-function binPurge(){ closeBinDialog(); adminPurgeOldDeleted(); }
-function toggleAdminMenu(key){
-  var m=$('amenu-'+key);if(!m)return;var was=m.style.display!=='none';
-  Array.prototype.forEach.call(document.querySelectorAll('.cardmenu .cmenu'),function(x){x.style.display='none';});
-  if(!was)m.style.display='block';}
-function openCreateUser(){
-  closeCreateUser();
-  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='cuDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Create user</h3><button class="dlg-x" aria-label="Close" onclick="closeCreateUser()">\u00d7</button></div>'
-    +'<label>Email</label><input id="ad_email" type="email" placeholder="tech@example.com">'
-    +'<label>Temporary password</label><input id="ad_pass" type="text" placeholder="8+ characters \u2014 share it with them">'
-    +'<p class="mut">Runs through the admin Edge Function. The new user can sign in right away.</p>'
-    +'<div style="display:flex;gap:8px"><button class="btn sec" style="flex:1" onclick="closeCreateUser()">Cancel</button>'
-    +'<button class="btn" style="flex:1" onclick="if(adminCreateUser())closeCreateUser()">Create user</button></div></div>';
-  ov.addEventListener('click',function(e){ if(e.target===ov) closeCreateUser(); });
-  document.body.appendChild(ov);
-}
-function closeCreateUser(){ var o=document.getElementById('cuDlg'); if(o) o.remove(); }
-function adminPurgeConfirm(pid){
-  var pr=((adminData&&adminData.projects)||[]).filter(function(x){return x.id===pid;})[0]; if(!pr)return;
-  var mem=((adminData&&adminData.members)||[]).filter(function(x){return x.project_id===pid;});
-  var ownerPr=((adminData&&adminData.profiles)||[]).filter(function(x){return x.id===pr.owner_id;})[0];
-  var ownerLbl=ownerPr?profLabel(ownerPr):String(pr.owner_id||'').slice(0,8)+'\u2026';
-  closePurge();
-  var ov=document.createElement('div'); ov.className='dlg-ov'; ov.id='purgeDlg';
-  ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Delete permanently?</h3><button class="dlg-x" aria-label="Close" onclick="closePurge()">\u00d7</button></div>'
-    +'<p style="margin:2px 0"><b>'+esc(pr.name)+'</b></p>'
-    +'<p class="mut" style="margin:2px 0">Owner '+esc(ownerLbl)+' \u00b7 '+mem.length+' member'+(mem.length===1?'':'s')+'</p>'
-    +'<div id="purgeCounts"><p class="mut">Counting records\u2026</p></div>'
-    +'<p class="mut">This removes the project and all its data from the server, for everyone. It disappears from every device on its next sync. There is no undo \u2014 Export is the only way back.</p>'
-    +'<div style="display:flex;gap:8px"><button class="btn sec" style="flex:1" onclick="closePurge()">Cancel</button>'
-    +'<button class="btn danger" id="purgeGo" style="flex:1" disabled onclick="adminPurgeGo(\''+pid+'\')">Delete permanently</button></div></div>';
-  ov.addEventListener('click',function(e){ if(e.target===ov) closePurge(); });
-  document.body.appendChild(ov);
-  sb.functions.invoke('admin',{body:{action:'projectStats',projectId:pid}}).then(function(r){
-    var box=$('purgeCounts'); if(!box)return;
-    if(r.error||!r.data||r.data.error||!r.data.counts){ box.innerHTML='<div class="err">Could not count its records \u2014 delete is unavailable.</div>'; return; }
-    var c=r.data.counts, L={time_entries:'Time entries',cable_pulls:'Cable pulls',materials:'Materials',ip_assignments:'IP assignments',poe_switches:'PoE switches',poe_devices:'PoE devices',port_switches:'Port switches',port_entries:'Port entries',technicians:'Technicians',members:'Members'}, rows=[];
-    Object.keys(L).forEach(function(k){ if(c[k]) rows.push(L[k]+': '+c[k]); });
-    box.innerHTML='<p class="mut">'+(rows.length?rows.join(' \u00b7 '):'No records \u2014 just the project itself.')+'</p>';
-    var b=$('purgeGo'); if(b) b.disabled=false;
-  },function(){ var box=$('purgeCounts'); if(box) box.innerHTML='<div class="err">Could not count its records \u2014 delete is unavailable.</div>'; });
-}
-function adminPurgeGo(pid){
-  closePurge();
-  adminFn('purgeProject',{projectId:pid},'Project deleted permanently');
-  if(projById(pid)){ pruneLocalProject(pid); save(); }
-}
-function closePurge(){ var o=document.getElementById('purgeDlg'); if(o) o.remove(); }
-function adminCreateUser(){
-  var em=val('ad_email'), pw=val('ad_pass');
-  if(!em||pw.length<8){ toast('Email + password (8+ chars) required'); return false; }
-  adminFn('createUser',{email:em,password:pw},'User created: '+em);
-  return true;
-}
-function adminSetAdmin(uid,make){
-  if(!make&&!confirm('Remove admin from this user?'))return;
-  adminFn('setAdmin',{userId:uid,admin:make},make?'Admin granted':'Admin removed');
-}
-function adminUntombstone(pid){ adminFn('untombstone',{projectId:pid},'Project restored'); }
-function adminRestoreProject(pid){
-  // v5.0 client-side restore (no Edge Function deploy needed): the project
-  // row plus every child row deleted at-or-after the project's deletion
-  // (individually deleted children stay deleted).
-  var pr=((adminData&&adminData.projects)||[]).filter(function(x){return x.id===pid;})[0];
-  var ts=pr&&pr.deleted_at;
-  if(!pr||!ts){ toast('Project is not deleted'); return; }
-  if(!confirm('Restore "'+pr.name+'" and everything deleted with it?')) return;
-  var tables=['time_entries','cable_pulls','materials','poe_switches','port_switches','ip_assignments','technicians'];
-  var jobs=[sb.from('projects').update({deleted_at:null}).eq('id',pid)];
-  tables.forEach(function(t){
-    jobs.push(sb.from(t).update({deleted_at:null}).eq('project_id',pid).gte('deleted_at',ts));
-  });
-  function restoreSwitchKids(swTable,kidTable){
-    return sb.from(swTable).select('id,deleted_at').eq('project_id',pid).then(function(r){
-      var ids=(r.data||[]).filter(function(s){ return !s.deleted_at||s.deleted_at>=ts; }).map(function(s){ return s.id; });
-      if(!ids.length) return;
-      return sb.from(kidTable).update({deleted_at:null}).in('switch_id',ids).gte('deleted_at',ts);
-    });
-  }
-  jobs.push(restoreSwitchKids('poe_switches','poe_devices'));
-  jobs.push(restoreSwitchKids('port_switches','port_entries'));
-  Promise.all(jobs).then(function(){
-    toast('Project restored');
-    adminData=null; loadAdminData(true);
-    if(view.name==='admin') render();
-    refreshFromServer(false);
-  },function(e){ toast('Restore failed: '+((e&&e.message)||'error')); });
-}
-function adminPurgeOldDeleted(){
-  var old=((adminData&&adminData.projects)||[]).filter(function(x){
-    return x.deleted_at&&new Date(x.deleted_at).getTime()<Date.now()-30*864e5;
-  });
-  if(!old.length){ toast('Nothing deleted 30+ days ago'); return; }
-  if(!confirm('Permanently delete '+old.length+' project(s) deleted over 30 days ago? This cannot be undone.')) return;
-  var chain=Promise.resolve(), done=0;
-  old.forEach(function(pr){
-    chain=chain.then(function(){
-      return sb.functions.invoke('admin',{body:{action:'purgeProject',projectId:pr.id}}).then(function(){ done++; },function(){});
-    });
-  });
-  chain.then(function(){
-    toast(done+' old project(s) permanently deleted');
-    adminData=null; loadAdminData(true);
-    if(view.name==='admin') render();
-  });
-}
-function adminRemoveMember(pid,uid){
-  if(!confirm('Remove this member from the project?'))return;
-  adminFn('removeMembership',{projectId:pid,userId:uid},'Member removed');
-}
-function adminEditName(uid){ adminNameEdit=uid; render(); }
-function adminCancelName(){ adminNameEdit=null; render(); }
-function adminSaveName(uid){
-  var v=val('ad_name_'+uid);
-  adminNameEdit=null;
-  adminFn('setDisplayName',{userId:uid,displayName:v},'Name saved');
-}
-
 /* ---------- header menu / sharing ---------- */
 function renderHdrMenu(){
   var m=$('hdrMenu'); if(!m) return;
@@ -4758,7 +4121,10 @@ function renderHdrMenu(){
     +'<button onclick="openImportForm()">Import project</button>'
     +'<button onclick="goBackup()">Backup / Restore</button>'
     +'<div class="mglbl">APP</div>';
-  if(isAdmin) h+='<button onclick="goAdmin()">Admin</button>';
+  if(fkIsMobileChrome()){
+    if(fkIsStandalone()) h+='<button class="fk-installed">App installed</button>';
+    else h+='<button onclick="fkInstallClick()">Install app</button>';
+  }
   h+='<button onclick="goAbout()">About</button>';
   if(sbReady&&sbUser){
     h+='<button onclick="openDiag()">Diagnostics</button>'
