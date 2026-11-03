@@ -600,6 +600,22 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
 @media (max-width:480px){ .bc-brand,.bc-brand + .bc-sep{display:none;} .k-cmd-kbd{display:none;} .k-cmd-btn{padding:6px 9px;} }
 .bc-tag{background:rgba(99,102,241,0.2);color:#c7d2fe;padding:2px 8px;border-radius:6px;font-size:.78rem;font-weight:600;border:1px solid rgba(99,102,241,0.3);}
 
+/* --- Company takeover of the identity spots (v5.9.1): the sidebar
+   brand block and the header cluster each render a stock variant
+   (.fkstock-el / .fkstock-logo-el) and a company variant (.fkco-el /
+   .fkco-logo-el). Company variants are display:none by default; the
+   gates below open only at the app's 1024px desktop breakpoint when
+   fkCoApply has marked the body .fkco (company name set) or .fkcologo
+   (logo set) -- so phones always show the stock identity. --- */
+.fkco-el,.fkco-logo-el{display:none!important}
+@media (min-width:1024px){
+  body.fkco .fkco-el{display:block!important}
+  body.fkco .fkco-el.fkco-flex{display:flex!important}
+  body.fkco .fkstock-el{display:none!important}
+  body.fkcologo .fkco-logo-el{display:block!important}
+  body.fkcologo .fkstock-logo-el{display:none!important}
+}
+
 /* --- Command Palette Trigger Button --- */
 .k-cmd-btn{
   background:rgba(255,255,255,0.06);border:1px solid var(--line);
@@ -897,7 +913,8 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
 <body>
 <header id="mainHdr">
   <div class="ttl" id="hdrTtl" style="display:flex;align-items:center;gap:12px;flex:1;min-width:0">
-    <img src="logo.png" alt="" style="width:36px;height:36px;border-radius:9px;flex:0 0 auto">
+    <img src="logo.png" alt="" class="fkstock-logo-el" style="width:36px;height:36px;border-radius:9px;flex:0 0 auto">
+    <img id="hdrLogoCo" alt="" class="fkco-logo-el" style="width:36px;height:36px;border-radius:9px;flex:0 0 auto;object-fit:cover">
     <div style="min-width:0;flex:1">
       <div id="hdrBreadcrumb" class="hdr-breadcrumbs"></div>
       <small id="hdrsub" style="display:none">Projects</small>
@@ -995,7 +1012,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.9';
+var APP_VERSION='5.9.1';
 var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1207,7 +1224,8 @@ function toggleHdrMenu(){var m=$('hdrMenu');m.style.display=m.style.display==='n
 function renderBreadcrumb(){
   var el=$('hdrBreadcrumb'); if(!el) return;
   var h='<div class="bc-container" style="display:flex;align-items:center;gap:6px">';
-  h+='<span class="bc-item bc-brand" onclick="goDashboard()">Field Kit</span>';
+  h+='<span class="bc-item bc-brand fkstock-el" onclick="goDashboard()">Field Kit</span>';
+  if(fkCompany&&fkCompany.name) h+='<span class="bc-item bc-brand fkco-el" onclick="goDashboard()">'+esc(fkCompany.name)+'</span>';
   if(sbReady&&!sbUser){
     h+='<span class="bc-sep">/</span><span class="bc-item bc-current">Sign In</span></div>';
     el.innerHTML=h;
@@ -1871,7 +1889,10 @@ function renderDeskSide(){
   var el=$('deskSide'); if(!el) return;
   if(sbReady&&!sbUser){ el.innerHTML=''; return; }
   var nav=[['dashboard','Dashboard','goDashboard()'],['projects','Projects','goProjects()'],['timer','Timer','goTimer()'],['activity','Activity','goActivity()'],['timesheet','Timesheet','goTimesheet()']];
-  var h='<div style="display:flex;align-items:center;gap:10px;padding:2px 6px 18px"><img src="logo.png" alt="" style="width:40px;height:40px;border-radius:10px;flex:0 0 auto"><div><div style="font-weight:800;font-size:1.05rem;line-height:1.1">Field Kit</div><div class="mut" style="font-size:.8rem">Datacom</div></div></div>';
+  var h='<div class="fkstock-el" style="display:flex;align-items:center;gap:10px;padding:2px 6px 18px"><img src="logo.png" alt="" style="width:40px;height:40px;border-radius:10px;flex:0 0 auto"><div><div style="font-weight:800;font-size:1.05rem;line-height:1.1">Field Kit</div><div class="mut" style="font-size:.8rem">Datacom</div></div></div>';
+  if(fkCompany&&fkCompany.name){
+    h+='<div class="fkco-el fkco-flex" style="align-items:center;gap:10px;padding:2px 6px 18px"><img src="'+esc(fkCompany.logo||'logo.png')+'" alt="" style="width:40px;height:40px;border-radius:10px;flex:0 0 auto;object-fit:cover"><div style="min-width:0"><div style="font-weight:800;font-size:1.05rem;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(fkCompany.name)+'</div><div class="mut" style="font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Datacom Field Kit</div></div></div>';
+  }
   nav.forEach(function(n){
     h+='<button class="dsnav'+(view.name===n[0]?' act':'')+'" onclick="'+n[2]+'">'+n[1]+'</button>';
   });
@@ -3504,6 +3525,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.9.1',items:['On desktop, your company name and logo (set in Field Kit Manage) now take over the sidebar and header branding \u2014 the phone layout is unchanged']},
  {v:'5.9',items:['Your company name and logo (set in Field Kit Manage) now show on the sign-in screen, and the logo becomes the app icon when Field Kit is installed']},
  {v:'5.8.1',items:['Recent activity now shows start and end times for time entries (for example 10:15\u201311:00 AM) instead of just the start time']},
  {v:'5.8',items:['New: Notifications \u2014 tap the bell in the header for overdue jobs, today\u2019s schedule, crew activity since your last visit, and a nudge if a timer runs past 10 hours','Header on phones: search is now just a magnifying-glass icon, making room for the bell','Cleaner three-dot menu: actions grouped under Project / Data / App, and Refresh now removed \u2014 the sync badge, pull-to-refresh, and the palette all refresh too']},
@@ -3639,8 +3661,10 @@ function initSupabase(){
 
 /* ---------- company branding (v5.9) ----------
    Read-only mirror of Field Kit Manage's company_settings row (id=1).
-   The sign-in screen is the only branded surface; the header and every
-   signed-in screen are untouched. Field Kit NEVER writes this table.
+   Branded surfaces: the sign-in screen, plus (v5.9.1) the app's own
+   identity spots -- the sidebar brand block and the header cluster --
+   at desktop widths only. Below the 1024px breakpoint the identity
+   spots stay stock at all times. Field Kit NEVER writes this table.
    Boot paints from the localStorage cache (or stock), then a background
    fetch refreshes it. Any failure leaves the stock v5.8.1 behaviour. */
 var FK_CO_KEY='fk_company_v1';
@@ -3679,6 +3703,14 @@ function fkCoApply(){
   }
   var el=document.getElementById('loginBrand');
   if(el) el.innerHTML=fkBrandHTML();
+  try{
+    document.body.classList.toggle('fkco',!!(c&&c.name));
+    document.body.classList.toggle('fkcologo',!!(c&&c.logo));
+    var hi=document.getElementById('hdrLogoCo');
+    if(hi) hi.src=(c&&c.logo)?c.logo:'';
+    renderBreadcrumb();
+    renderDeskSide();
+  }catch(e){}
   if(c&&c.logo) fkBrandIcons();
 }
 function loadCompanyBrand(){
