@@ -757,6 +757,26 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
 .net-rack{position:absolute;min-width:48px;min-height:38px;border:1px solid rgba(99,102,241,0.45);border-radius:8px;background:linear-gradient(180deg, rgba(99,102,241,0.20), rgba(99,102,241,0.08));color:var(--text);font:inherit;text-align:left;padding:6px 8px;cursor:pointer;overflow:hidden;}
 .net-rack .rnm{font-weight:700;font-size:.82rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .net-rack .rsub{color:var(--muted);font-size:.7rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.net-item{position:absolute;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:2px 6px;pointer-events:none;}
+.net-item .inm{font-size:.68rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;}
+.net-item.vert .inm{writing-mode:vertical-rl;}
+.net-tray{border:1px solid rgba(245,158,11,0.55);background-color:rgba(245,158,11,0.12);background-image:linear-gradient(0deg,transparent calc(50% - 1px),rgba(245,158,11,0.7) calc(50% - 1px),rgba(245,158,11,0.7) calc(50% + 1px),transparent calc(50% + 1px)),repeating-linear-gradient(45deg,rgba(245,158,11,0.18) 0 6px,transparent 6px 12px);color:#fcd34d;}
+.net-tray.vert{background-image:linear-gradient(90deg,transparent calc(50% - 1px),rgba(245,158,11,0.7) calc(50% - 1px),rgba(245,158,11,0.7) calc(50% + 1px),transparent calc(50% + 1px)),repeating-linear-gradient(45deg,rgba(245,158,11,0.18) 0 6px,transparent 6px 12px);}
+.net-panel{border:1px solid rgba(148,163,184,0.55);background:linear-gradient(180deg,rgba(148,163,184,0.30),rgba(148,163,184,0.13));color:#cbd5e1;}
+.net-door{overflow:visible;}
+.net-door .dgap{fill:var(--panel2);}
+.net-door .dwedge{fill:rgba(226,232,240,0.05);}
+.net-door .darc{fill:none;stroke:rgba(226,232,240,0.55);stroke-width:1.6;stroke-dasharray:5 4;}
+.net-door .dlf{stroke:#e2e8f0;stroke-width:2.6;}
+.net-door .dhinge{fill:#e2e8f0;}
+.net-door .dlab{position:absolute;left:50%;bottom:1px;transform:translateX(-50%);color:var(--muted);font-size:.62rem;font-weight:600;}
+.net-sw.sw-door{border:1px solid rgba(226,232,240,0.5);background:radial-gradient(circle at 0 100%,transparent 52%,rgba(226,232,240,0.55) 53%,rgba(226,232,240,0.55) 63%,transparent 64%);}
+.net-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:.75rem;color:var(--muted);}
+.net-lg{display:inline-flex;align-items:center;gap:6px;}
+.net-sw{width:16px;height:10px;border-radius:3px;flex:none;}
+.net-sw.sw-rack{border:1px solid rgba(99,102,241,0.55);background:rgba(99,102,241,0.22);}
+.net-sw.sw-tray{border:1px solid rgba(245,158,11,0.6);background:repeating-linear-gradient(45deg,rgba(245,158,11,0.4) 0 3px,rgba(245,158,11,0.12) 3px 6px);}
+.net-sw.sw-panel{border:1px solid rgba(148,163,184,0.6);background:rgba(148,163,184,0.28);}
 .net-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;margin-bottom:10px;}
 .net-chip{flex:0 0 auto;background:var(--chip);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:7px 13px;font:inherit;font-size:.85rem;cursor:pointer;}
 .net-chip.on{background:rgba(99,102,241,0.25);border-color:rgba(99,102,241,0.45);color:#c7d2fe;font-weight:700;}
@@ -949,7 +969,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.13';
+var APP_VERSION='5.14';
 var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -2600,7 +2620,8 @@ function cableHistoryHTML(p){
   return h;
 }
 /* ============ NETWORK (v5.13) ============ */
-/* The site's network rooms, racks and rack devices — the records
+/* The site's network rooms, racks, rack devices and room items
+   (cable trays, wall panels and doors) — the records
    Manage's Network Room Designer owns — shown READ-ONLY here: the
    room map and the rack elevations render exactly as designed, with
    no add, move or edit controls. The one interactive element is a
@@ -2609,7 +2630,7 @@ function cableHistoryHTML(p){
    ports stay fully editable. Loaded at sign-in alongside the
    catalog; if the tables are not there, everything below simply
    stays empty and the rest of the app is untouched. */
-var netRooms=[], netRacks=[], netDevices=[];
+var netRooms=[], netRacks=[], netDevices=[], netItems=[];
 var netRoomId=null, netRackId=null, netSwId=null, netFromLog=false;
 var NET_TYPES=[['switch','Switch'],['patch_panel','Patch panel'],['ups','UPS'],['nvr_server','NVR / Server'],['router_firewall','Router / Firewall'],['pdu','PDU'],['cable_manager','Cable manager'],['blank','Blank'],['other','Other']];
 var NET_ROW=26;
@@ -2619,11 +2640,13 @@ function loadNetwork(){
   return Promise.all([
     sb.from('network_rooms').select('*'),
     sb.from('racks').select('*'),
-    sb.from('rack_devices').select('*')
+    sb.from('rack_devices').select('*'),
+    sb.from('room_items').select('*')
   ]).then(function(rs){
     if(rs[0]&&!rs[0].error) netRooms=rs[0].data||[];
     if(rs[1]&&!rs[1].error) netRacks=rs[1].data||[];
     if(rs[2]&&!rs[2].error) netDevices=rs[2].data||[];
+    if(rs[3]&&!rs[3].error) netItems=rs[3].data||[];
   }).catch(function(){});
 }
 function netSortName(a,b){return ((a.sort||0)-(b.sort||0))||String(a.name||'').localeCompare(String(b.name||''));}
@@ -2632,6 +2655,7 @@ function netRackById(id){if(!id)return null;for(var i=0;i<netRacks.length;i++)if
 function netRoomsOf(siteId){if(!siteId)return [];return netRooms.filter(function(r){return r.site_id===siteId&&!r.deleted_at;}).sort(netSortName);}
 function netRacksOf(roomId){return netRacks.filter(function(r){return r.room_id===roomId&&!r.deleted_at;}).sort(netSortName);}
 function netDevsOf(rackId){return netDevices.filter(function(d){return d.rack_id===rackId&&!d.deleted_at;});}
+function netItemsOf(roomId){return netItems.filter(function(it){return it.room_id===roomId&&!it.deleted_at;}).sort(netSortName);}
 function netUsedU(rackId){return netDevsOf(rackId).reduce(function(n,d){return n+(d.u_size||1);},0);}
 function netSiteSwitches(siteId){if(!siteId)return [];return data.portSwitches.filter(function(s){return s.siteId===siteId;}).sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});}
 function netPlacementOf(swId){
@@ -2656,7 +2680,9 @@ function networkCardHTML(p){
     +'<p class="mut">Network rooms at '+esc(p.site||'this site')+' \u2014 the layout is managed in Manage; here it is view-only, and switch ports stay editable.</p>'
     +rooms.map(function(r){
       var rk=netRacksOf(r.id);
-      return '<div class="kv"><span><b>'+esc(r.name)+'</b><br><span class="mut">'+rk.length+' rack'+(rk.length===1?'':'s')+'</span></span>'
+      var its=netItemsOf(r.id);
+      var ntp=its.filter(function(x){return x.type!=='door';}).length, ndr=its.length-ntp;
+      return '<div class="kv"><span><b>'+esc(r.name)+'</b><br><span class="mut">'+rk.length+' rack'+(rk.length===1?'':'s')+(ntp?' \u00b7 '+ntp+' tray/panel item'+(ntp===1?'':'s'):'')+(ndr?' \u00b7 '+ndr+' door'+(ndr===1?'':'s'):'')+'</span></span>'
         +'<button class="btn sec sml" onclick="netOpenRoom(\''+r.id+'\')">View \u203a</button></div>';
     }).join('')
     +'<div class="kv" style="margin-top:8px"><span class="mut">Site switches</span><b>'+netSiteSwitches(p.siteId).length+'</b></div></div>';
@@ -2685,6 +2711,27 @@ function networkHTML(p){
   }
   return netRoomsHTML(p);
 }
+/* A door symbol in a size_w square anchored at map_x/map_y: the
+   base glyph has its wall along the top edge, hinge at the left,
+   swing 'in' (arc opens into the room). Hinge/swing mirror the
+   glyph, map_rot rotates it onto its wall. Pure display: the SVG
+   is inert and the wrapper keeps pointer-events:none. */
+function netDoorHTML(it,w,d){
+  var rot=((Number(it.map_rot)||0)%360+360)%360;
+  var swing=it.door_swing==='out'?'out':'in', hinge=it.door_hinge==='right'?'right':'left';
+  var iw=Number(it.size_w)||3;
+  var mt=hinge==='right'?(swing==='out'?'translate(100 0) scale(-1 -1)':'translate(100 0) scale(-1 1)'):(swing==='out'?'scale(1 -1)':'');
+  var svg='<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;width:100%;height:100%">'
+    +'<g'+(rot?' transform="rotate('+rot+' 50 50)"':'')+'><g'+(mt?' transform="'+mt+'"':'')+'>'
+    +'<rect class="dgap" x="0" y="-4" width="100" height="8"></rect>'
+    +'<path class="dwedge" d="M0 0 L100 0 A100 100 0 0 1 0 100 Z"></path>'
+    +'<path class="darc" d="M100 0 A100 100 0 0 1 0 100"></path>'
+    +'<line class="dlf" x1="0" y1="0" x2="0" y2="100"></line>'
+    +'<circle class="dhinge" cx="0" cy="0" r="2.6"></circle>'
+    +'</g></g></svg>';
+  return '<div class="net-item net-door" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(iw/d*100)+'">'
+    +svg+'<span class="inm dlab">'+esc(it.name)+'</span></div>';
+}
 function netRoomsHTML(p){
   var rooms=netRoomsOf(p.siteId);
   if(!rooms.some(function(r){return r.id===netRoomId;}))netRoomId=rooms.length?rooms[0].id:null;
@@ -2698,13 +2745,21 @@ function netRoomsHTML(p){
   h+='<div class="card"><h3>'+esc(room.name)+' \u2014 top-down</h3>'
     +'<div class="kv" style="margin:6px 0 10px"><span class="mut">'+w+' ft \u2014 '+Math.round(w*12)+' in</span><span class="mut">'+d+' ft deep</span></div>'
     +'<div class="net-map" style="aspect-ratio:'+w+'/'+d+';background-size:'+(50/w)+'% '+(50/d)+'%;background-image:linear-gradient(rgba(255,255,255,0.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.045) 1px,transparent 1px)">';
+  netItemsOf(room.id).forEach(function(it){
+    if(it.type==='door'){h+=netDoorHTML(it,w,d);return;}
+    var irot=((it.map_rot||0)%180)!==0;
+    var iw=irot?Number(it.size_d):Number(it.size_w), ih=irot?Number(it.size_w):Number(it.size_d);
+    h+='<div class="net-item '+(it.type==='cable_tray'?'net-tray':'net-panel')+(irot?' vert':'')+'" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(ih/d*100)+'%">'
+      +'<span class="inm">'+esc(it.name)+'</span></div>';
+  });
   racks.forEach(function(r){
     var rot=((r.map_rot||0)%180)!==0;
     var fw=rot?Number(r.fp_d):Number(r.fp_w), fd=rot?Number(r.fp_w):Number(r.fp_d);
     h+='<button type="button" class="net-rack" onclick="netOpenRack(\''+r.id+'\')" style="left:'+(Number(r.map_x)/w*100)+'%;top:'+(Number(r.map_y)/d*100)+'%;width:'+(fw/w*100)+'%;height:'+(fd/d*100)+'%">'
       +'<span class="rnm">'+esc(r.name)+'</span><span class="rsub">'+(r.height_u||42)+'U \u00b7 '+netDevsOf(r.id).length+' devices</span></button>';
   });
-  h+='</div><p class="mut" style="margin-top:10px">Tap a rack to see its elevation. View-only \u2014 the layout is managed in Manage.</p></div>';
+  h+='</div><div class="net-legend"><span class="net-lg"><span class="net-sw sw-rack"></span>Rack</span><span class="net-lg"><span class="net-sw sw-tray"></span>Cable tray</span><span class="net-lg"><span class="net-sw sw-panel"></span>Wall panel</span><span class="net-lg"><span class="net-sw sw-door"></span>Door</span></div>'
+    +'<p class="mut" style="margin-top:10px">Tap a rack to see its elevation. View-only \u2014 the layout is managed in Manage.</p></div>';
   h+='<div class="card"><h3>Racks in '+esc(room.name)+'</h3>';
   if(!racks.length)h+='<p class="mut">No racks in this room yet.</p>';
   racks.forEach(function(r){
@@ -3508,6 +3563,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.14',items:['Network: cable trays, wall panels and doors placed in Field Kit Manage now show on the room map too, with a small legend \u2014 still view-only here','Network rooms on the overview now note how many trays and panels each room has']},
  {v:'5.13',items:['New: Network \u2014 the network rooms and racks at a job\u2019s site, right on the project overview. View-only here; the layout itself is managed in Field Kit Manage','Port log: the site\u2019s switches now come first, with their room and rack \u2014 their port map is shared by every job at the site, and ports stay editable here','A switch added on a job at a site now belongs to the site and starts unplaced, ready to be given a rack in Manage. Switches that belong to a single job are unchanged']},
  {v:'5.12',items:['Cable is a regular material now: the Cable tab is retired, and pulls already logged stay on their job as a read-only history list','Materials: Quick picks from the company catalog \u2014 search the catalog, set or type a quantity, tap to log','ConnectWise Notes: the CABLE section appears only on jobs that have cable pulls','New Materials icon \u2014 the parts tote']},
  {v:'5.11',items:['Design polish: status badges, form labels and shadows now match the Field Kit Manage family look','One button style retired \u2014 a single red for destructive actions']},
