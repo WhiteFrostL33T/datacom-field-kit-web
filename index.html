@@ -904,8 +904,6 @@ function ipToInt(ip){var p=String(ip).trim().split('.');if(p.length!==4)return n
   var n=0;for(var i=0;i<4;i++){var o=Number(p[i]);if(!isFinite(o)||o<0||o>255||p[i]=='')return null;n=((n<<8)|o)>>>0;}return n;}
 function intToIp(n){return [((n>>>24)&255),((n>>>16)&255),((n>>>8)&255),(n&255)].join('.');}
 window.FK={
-  cableUsed:function(a,b,boxSize){boxSize=(boxSize==null||boxSize===''||!isFinite(boxSize))?1000:Number(boxSize);
-    if(b===null||b===undefined||b==='')return boxSize-Number(a);return Number(a)-Number(b);},
   storageTB:function(cams,mbps,hours,days){return (Number(mbps)/8*3600*Number(hours)*Number(days)*Number(cams))/1e6;},
   storageDays:function(cams,mbps,hours,tb){var perDay=Number(mbps)/8*3600*Number(hours)*Number(cams);
     return perDay>0?(Number(tb)*1e6)/perDay:0;},
@@ -926,11 +924,11 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.11';
-var MODULES=[['time','Time'],['cable','Cable'],['materials','Materials'],['finallog','Connectwise Notes'],
+var APP_VERSION='5.12';
+var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
-var DEFAULT_MODULES=['time','cable','materials'];
+var DEFAULT_MODULES=['time','materials'];
 var KINDS=['Drive','On site','Remote','Shop'];
 function allModuleKeys(){return MODULES.map(function(m){return m[0];});}
 function defaultData(){return {projects:[],timeEntries:[],timer:null,pulls:[],
@@ -1009,6 +1007,7 @@ function toast(msg){var t=$('toast');if(!t)return;t.textContent=msg;t.className=
   clearTimeout(t._h);t._h=setTimeout(function(){t.className='';},2600);}
 function projById(id){return data.projects.filter(function(p){return p.id===id;})[0]||null;}
 function enabledMods(p){var m=(p.enabledModules&&p.enabledModules.length)?p.enabledModules.slice():allModuleKeys();
+  m=m.filter(function(k){return allModuleKeys().indexOf(k)>=0;}); // v5.12: retired module keys stored on a project are ignored
   ALWAYS_ON.forEach(function(k){if(m.indexOf(k)<0)m.push(k);});return m;}
 function fmtH(min){if(!isFinite(min))min=0;return (Math.round(min)/60).toFixed(2).replace(/\.?0+$/,'')+' h';}
 function fmtHM(min){min=Math.round(min);var h=Math.floor(min/60),m=min%60;
@@ -1021,24 +1020,12 @@ function projectMinutes(pid){return data.timeEntries.filter(function(e){return e
 function isMine(e){ return !sbUser||!e.userId||e.userId===sbUser.id; }
 function myProjectMinutes(pid){ return data.timeEntries.filter(function(e){return e.projectId===pid&&isMine(e);})
   .reduce(function(s,e){return s+entryMinutes(e);},0); }
-var CABLE_TYPES=['CAT6 Riser','CAT6 Plenum','Controlled Access Cable','2 Conductor Cable','4 Conductor Cable','6 Conductor Cable'];
-var CABLE_COLORS=['Blue','Black','White','Gray','Red','Green','Yellow','Orange','Purple','Brown'];
-var cableOpts=null, cableOptsLoaded=false, cableOptsMissing=false;
-function cableTypeList(){ return (cableOpts&&cableOpts.types)||CABLE_TYPES; }
-function cableColorList(){ return (cableOpts&&cableOpts.colors)||CABLE_COLORS; }
-function loadCableOptions(){
-  if(!sb||!sbUser) return;
-  if(cableOptsLoaded) return;
-  cableOptsLoaded=true;
-  sb.from('cable_options').select('kind,value').then(function(r){
-    if(r.error){ cableOptsMissing=true; cableOpts=null; }
-    else{
-      var t=[], c=[];
-      (r.data||[]).forEach(function(row){ if(row.kind==='type') t.push(row.value); else if(row.kind==='color') c.push(row.value); });
-      cableOpts={ types:t.length?t:null, colors:c.length?c:null };
-    }
-  },function(){ cableOptsMissing=true; cableOpts=null; });
-}
+/* v5.12: the cable_options read path is retired — Field Kit no longer
+   loads cable lists (cable is logged as a regular material now). The
+   built-in color list survives ONLY to format legacy pulls in the
+   ConnectWise notes, where a stored color is told apart from an old
+   box label exactly as before. */
+var LEGACY_CABLE_COLORS=['Blue','Black','White','Gray','Red','Green','Yellow','Orange','Purple','Brown'];
 function dayLabel(key){ var y=+key.slice(0,4),m=+key.slice(5,7)-1,d=+key.slice(8,10);
   var dt=new Date(y,m,d);
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+', '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m]+' '+d; }
@@ -1629,7 +1616,7 @@ var MODICONS={
  overview:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
  time:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
  cable:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="15.5" cy="12" rx="3.5" ry="7"/><path d="M6.2 6.8h6.4M6.2 10.2h6.4M6.2 13.8h6.4M6.2 17.2h6.4"/><ellipse cx="7.5" cy="12" rx="3.5" ry="7"/><ellipse cx="7.5" cy="12" rx="1.2" ry="3.4" stroke-width="1.2"/><path d="M8 18.4c1.5 1.6 3 2.6 8 2.6"/></svg>',
- materials:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M5.5 9.2h2.3v2.3H5.5zM9.4 9.2h2.3v2.3H9.4zM13.3 9.2h2.3v2.3h-2.3zM17.2 9.2h2.3v2.3h-2.3zM5.5 12.7h2.3v2.3H5.5zM9.4 12.7h2.3v2.3H9.4zM13.3 12.7h2.3v2.3h-2.3zM17.2 12.7h2.3v2.3h-2.3z" stroke-width="1.2"/></svg>',
+ materials:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6.4" y="3.2" width="3.6" height="3.6" rx="0.6" stroke-width="1.2"/><circle cx="15.6" cy="5" r="1.5" stroke-width="1.2"/><path d="M14.9 4.3l1.4 1.4" stroke-width="1.2"/><rect x="2.6" y="7.4" width="18.8" height="2.6" rx="1.3"/><path d="M4.2 10l1.5 8.9a2 2 0 0 0 2 1.7h8.6a2 2 0 0 0 2-1.7L19.8 10"/><path d="M9.5 15.2h5" stroke-width="1.2"/></svg>',
  finallog:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v4h4"/></svg>',
  storage:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg>',
  poe:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>',
@@ -2072,7 +2059,7 @@ function renderProjects(){
     +'<label>Notes</label><textarea id="np_notes"></textarea>'
     +'<button class="btn grn" onclick="createProject()">Create project</button></div></div>';
   if(!data.projects.length){
-    h+='<div class="card" style="margin-top:12px"><p class="mut">No projects yet. Create your first project to start tracking time, cable, materials and more.</p></div>';
+    h+='<div class="card" style="margin-top:12px"><p class="mut">No projects yet. Create your first project to start tracking time, materials and more.</p></div>';
   }
   h+='<div id="importForm" style="display:none;margin-top:12px"><div class="card"><h3>Import project</h3>'
     +'<p class="mut">Bring in a project exported from another device (a fieldkit-*.json file).</p>'
@@ -2289,7 +2276,6 @@ function renderProject(){
   var body=$('tabBody');
   if(curTab==='overview')body.innerHTML=overviewHTML(p);
   else if(curTab==='time')body.innerHTML=timeHTML(p);
-  else if(curTab==='cable')body.innerHTML=cableHTML(p);
   else if(curTab==='storage'){body.innerHTML=storageHTML(p);storageRecalc(p);}
   else if(curTab==='poe')body.innerHTML=poeHTML(p);
   else if(curTab==='subnet'){body.innerHTML=subnetHTML(p);}
@@ -2303,7 +2289,6 @@ function renderProject(){
 }
 function modMetric(p,id){
   if(id==='time')return data.timeEntries.filter(function(e){return e.projectId===p.id;}).length+' entries';
-  if(id==='cable')return projectCableFt(p.id)+' ft pulled';
   if(id==='materials')return data.materials.filter(function(m){return m.projectId===p.id;}).length+' lines';
   if(id==='poe')return data.poeSwitches.filter(function(s){return s.projectId===p.id;}).length+' switches';
   if(id==='subnet')return data.ipAssignments.filter(function(a){return a.projectId===p.id;}).length+' IPs assigned';
@@ -2340,6 +2325,7 @@ function overviewHTML(p){
         +'<div style="font-weight:700;margin-top:9px">'+esc(lbl?lbl[1]:id)+'</div>'
         +(met?'<div class="mut" style="font-size:.8rem;margin-top:2px">'+esc(met)+'</div>':'')
         +'</button>';}).join('')+'</div>';
+  h+=cableHistoryHTML(p);
   var ev=[];
   data.timeEntries.forEach(function(e){ if(e.projectId!==p.id)return; var t=new Date(e.startISO).getTime(); ev.push({t:isFinite(t)?t:0,type:'time',e:e}); });
   data.pulls.forEach(function(x){ if(x.projectId!==p.id)return; var t=x.createdAt||(x.date?new Date(x.date+'T12:00:00').getTime():0); ev.push({t:isFinite(t)?t:0,type:'pull',e:x}); });
@@ -2565,71 +2551,27 @@ function delTimeEntry(id){var e=data.timeEntries.filter(function(x){return x.id=
 </script>
 
 <script>
-/* ============ CABLE TAB ============ */
-var pullMode='range';
-function cableHTML(p){
-  var boxes={};
-  data.pulls.filter(function(x){return x.projectId===p.id;}).forEach(function(x){
-    var key=x.box||'Box 1';
-    if(!boxes[key])boxes[key]={size:Number(x.boxSize)||1000,used:0,rows:[]};
-    boxes[key].used+=Number(x.used)||0;boxes[key].rows.push(x);});
-  var boxNames=Object.keys(boxes);
-  var h=modHero(p,'Cable',projectCableFt(p.id)+' ft')+'<div class="card"><h3>Add cable pull</h3>'
-    +'<div class="row"><div><label>Cable type</label><select id="cp_run">'
-    +cableTypeList().map(function(t){return '<option>'+esc(t)+'</option>';}).join('')+'</select></div>'
-    +'<div><label>Cable Color</label><select id="cp_box">'
-    +cableColorList().map(function(c){return '<option>'+esc(c)+'</option>';}).join('')+'</select></div></div>'
-    +'<label>Box size (ft)</label><input id="cp_size" type="number" inputmode="decimal" value="1000">'
-    +'<label>Markings on the box</label><div class="seg">'
-    +'<button type="button" id="pm_range" class="'+(pullMode==='range'?'act':'')+'" onclick="setPullMode(\'range\')">Previous + newest</button>'
-    +'<button type="button" id="pm_single" class="'+(pullMode==='single'?'act':'')+'" onclick="setPullMode(\'single\')">Single marking</button></div>'
-    +'<div id="pm_range_fields" style="display:'+(pullMode==='range'?'block':'none')+'">'
-    +'<div class="row"><div><label>Previous number (ft)</label><input id="cp_prev" type="number" inputmode="decimal"></div>'
-    +'<div><label>Newest number (ft)</label><input id="cp_new" type="number" inputmode="decimal"></div></div>'
-    +'<p class="mut">Used = previous − newest.</p></div>'
-    +'<div id="pm_single_fields" style="display:'+(pullMode==='single'?'block':'none')+'">'
-    +'<label>Marking (ft remaining on box)</label><input id="cp_mark" type="number" inputmode="decimal">'
-    +'<p class="mut">Used = box size − marking.</p></div>'
-    +'<div id="cp_err"></div>'
-    +'<button class="btn" onclick="addPull()">Add pull</button></div>';
-  h+='<div class="card"><h3>Pulls on this job</h3>';
-  if(!boxNames.length)h+='<p class="mut">No pulls logged yet.</p>';
-  boxNames.forEach(function(b){
-    var bx=boxes[b];
-    h+='<h4>'+esc(b)+' — '+bx.used+' ft used · '+Math.max(0,bx.size-bx.used)+' ft left of '+bx.size+'</h4>';
-    h+='<table><tr><th>Cable type</th><th>Markings</th><th>Used</th><th></th></tr>';
-    bx.rows.forEach(function(x){
-      var mk=x.mode==='single'?('single '+x.marking):(x.prev+' → '+x.newest);
-      h+='<tr><td>'+esc(x.run||'')+'</td><td>'+esc(mk)+'</td><td><b>'+x.used+' ft</b></td>'
-        +'<td><button class="del" onclick="delPull(\''+x.id+'\')">Del</button></td></tr>';});
-    h+='</table>';});
-  h+='<div class="kv" style="margin-top:8px"><span class="mut">Project total</span><b>'+projectCableFt(p.id)+' ft</b></div></div>';
+/* ============ CABLE HISTORY (v5.12) ============ */
+/* The Cable module is retired: cable is logged as a regular material.
+   Pulls logged before v5.12 stay on their job as a read-only history
+   list — no add/edit/delete controls, and the rows are never touched. */
+function cableHistoryHTML(p){
+  var rows=data.pulls.filter(function(x){return x.projectId===p.id;});
+  if(!rows.length)return '';
+  rows=rows.slice().sort(function(a,b){
+    var da=a.date||'',db=b.date||'';
+    if(da!==db)return da<db?-1:1;
+    return (a.createdAt||0)-(b.createdAt||0);});
+  var h='<div class="card"><h3>Cable pulls \u2014 history</h3>'
+    +'<p class="mut">Cable is logged as a material now. These pulls stay on the job exactly as recorded.</p>'
+    +'<table><tr><th>Date</th><th>Type</th><th>Color</th><th>Used</th></tr>'
+    +rows.map(function(x){
+      return '<tr><td>'+esc(x.date||'')+'</td><td>'+esc(x.run||'Unspecified')+'</td><td>'+esc(x.box||'')+'</td>'
+        +'<td><b>'+(Number(x.used)||0)+' ft</b></td></tr>';}).join('')
+    +'</table>'
+    +'<div class="kv" style="margin-top:8px"><span class="mut">Project total</span><b>'+projectCableFt(p.id)+' ft</b></div></div>';
   return h;
 }
-function setPullMode(m){pullMode=m;
-  $('pm_range').className=m==='range'?'act':'';$('pm_single').className=m==='single'?'act':'';
-  $('pm_range_fields').style.display=m==='range'?'block':'none';
-  $('pm_single_fields').style.display=m==='single'?'block':'none';}
-function addPull(){
-  var size=num('cp_size')||1000,err='';
-  var used,prev=null,newest=null,marking=null;
-  if(pullMode==='range'){
-    prev=parseFloat(val('cp_prev'));newest=parseFloat(val('cp_new'));
-    if(!isFinite(prev)||!isFinite(newest))err='Enter both the previous and newest markings.';
-    else if(prev<0||prev>size||newest<0||newest>size)err='Markings must be between 0 and the box size ('+size+' ft).';
-    else{used=FK.cableUsed(prev,newest,size);if(used<=0)err='Used footage must be more than 0 — check the markings.';}
-  }else{
-    marking=parseFloat(val('cp_mark'));
-    if(!isFinite(marking))err='Enter the single marking.';
-    else if(marking<0||marking>size)err='Marking must be between 0 and the box size ('+size+' ft).';
-    else{used=FK.cableUsed(marking,null,size);if(used<=0)err='Used footage must be more than 0 — check the marking.';}
-  }
-  if(err){$('cp_err').innerHTML='<div class="err">'+esc(err)+'</div>';return;}
-  data.pulls.push({id:uid(),projectId:view.id,createdAt:Date.now(),run:val('cp_run'),box:val('cp_box')||'Box 1',
-    boxSize:size,mode:pullMode,prev:prev,newest:newest,marking:marking,used:used,date:todayStr()});
-  save();render();toast('Pull added — '+used+' ft');}
-function delPull(id){if(!confirm('Delete this pull?'))return;
-  data.pulls=data.pulls.filter(function(x){return x.id!==id;});save();render();}
 /* ============ STORAGE TAB ============ */
 var ST_PRESETS=[['1080p',4],['4MP',8],['5MP',10],['4K',16]];
 function storageHTML(p){
@@ -2886,7 +2828,7 @@ var MAT_UNITS=['each','box','pack','roll','ft','other'];
 function materialsHTML(p){
   var rows=data.materials.filter(function(m){return m.projectId===p.id;});
   var totalQty=rows.reduce(function(s,m){return s+(Number(m.qty)||0);},0);
-  var h=modHero(p,'Materials',rows.length+' lines · '+totalQty+' items')+'<div class="card"><h3>'+(matEditId?'Edit material':'Add material')+'</h3>'
+  var h=modHero(p,'Materials',rows.length+' lines · '+totalQty+' items')+catalogPicksHTML(p)+'<div class="card"><h3>'+(matEditId?'Edit material':'Add material')+'</h3>'
     +matPicksHTML()
     +'<label>Item name</label><input id="mt_name" placeholder="e.g. Keystone jack">'
     +'<div class="row"><div><label>Qty</label><input id="mt_qty" type="number" inputmode="decimal" value="1"></div>'
@@ -2897,7 +2839,7 @@ function materialsHTML(p){
     +(matEditId?'<button class="btn sec" style="margin-top:8px" onclick="matEditId=null;render()">Cancel edit</button>':'')
     +'</div>';
   h+='<div class="card"><h3>Materials used</h3>';
-  if(!rows.length)h+='<p class="mut">Nothing logged yet. Cable footage lives in the Cable tab — everything else the job uses goes here.</p>';
+  if(!rows.length)h+='<p class="mut">Nothing logged yet — everything the job uses goes here, cable included.</p>';
   else{
     h+='<table><tr><th>Item</th><th>Qty</th><th>Notes</th><th></th></tr>'
       +rows.map(function(m){return '<tr><td>'+esc(m.name)+'</td><td>'+m.qty+' '+esc(m.unit)+'</td><td>'+esc(m.notes||'')+'</td>'
@@ -3000,16 +2942,17 @@ function connectwiseNotes(p){
     });
     L.push('Total time: '+fmtH(grand));
   }
-  L.push('');
-  L.push('CABLE');
-  L.push('----------------------------------------');
-  var byType={};
-  data.pulls.filter(function(x){return x.projectId===p.id;}).forEach(function(x){
-    var t=x.run||'Unspecified'; if(x.box&&cableColorList().indexOf(x.box)>=0) t+=' ('+x.box+')';
-    byType[t]=(byType[t]||0)+(Number(x.used)||0);});
-  var types=Object.keys(byType);
-  if(!types.length)L.push('No cable pulls logged.');
-  else types.forEach(function(t){L.push(t+': '+byType[t]+' ft');});
+  var jobPulls=data.pulls.filter(function(x){return x.projectId===p.id;});
+  if(jobPulls.length){
+    L.push('');
+    L.push('CABLE');
+    L.push('----------------------------------------');
+    var byType={};
+    jobPulls.forEach(function(x){
+      var t=x.run||'Unspecified'; if(x.box&&LEGACY_CABLE_COLORS.indexOf(x.box)>=0) t+=' ('+x.box+')';
+      byType[t]=(byType[t]||0)+(Number(x.used)||0);});
+    Object.keys(byType).forEach(function(t){L.push(t+': '+byType[t]+' ft');});
+  }
   L.push('');
   L.push('MATERIALS');
   L.push('----------------------------------------');
@@ -3072,6 +3015,105 @@ function editMaterial(id){var m=data.materials.filter(function(x){return x.id===
   $('mt_unit').value=m.unit;$('mt_notes').value=m.notes||'';window.scrollTo(0,0);}
 function delMaterial(id){if(!confirm('Delete this material line?'))return;
   data.materials=data.materials.filter(function(x){return x.id!==id;});save();render();}
+/* ============ CATALOG QUICK PICKS (v5.12) ============ */
+/* Read-only view of the Manage catalog (the material_categories tree +
+   materials_catalog items). Loaded at sign-in alongside prefs; picking
+   an item logs a regular materials row on the project — the same
+   shape saveMaterial() writes. The catalog itself is edited in Manage. */
+var catalogCats=[], catalogItems=[];
+var qpQuery='', qpQty={};
+function loadCatalog(){
+  if(!sb||!sbUser) return Promise.resolve();
+  return Promise.all([
+    sb.from('material_categories').select('id,name,parent_id,sort').is('deleted_at',null),
+    sb.from('materials_catalog').select('id,name,unit,category_id,attrs').is('deleted_at',null)
+  ]).then(function(rs){
+    if(rs[0]&&!rs[0].error) catalogCats=(rs[0].data||[]).slice().sort(function(a,b){
+      return ((a.sort||0)-(b.sort||0))||String(a.name||'').localeCompare(String(b.name||'')); });
+    if(rs[1]&&!rs[1].error) catalogItems=(rs[1].data||[]).slice().sort(function(a,b){
+      return String(a.name||'').localeCompare(String(b.name||'')); });
+  }).catch(function(){});
+}
+function qpCatById(id){
+  return catalogCats.filter(function(c){ return c.id===id; })[0]||null;
+}
+function qpPathFor(it){
+  if(!it.category_id) return 'Uncategorized';
+  var c=qpCatById(it.category_id); if(!c) return 'Uncategorized';
+  if(c.parent_id){ var p=qpCatById(c.parent_id); return (p?p.name+' \u203a ':'')+c.name; }
+  return c.name;
+}
+function qpSearchText(it){
+  var parts=[it.name||'', it.unit||''];
+  if(it.category_id){ var c=qpCatById(it.category_id); if(c){ parts.push(c.name||'');
+    if(c.parent_id){ var p=qpCatById(c.parent_id); if(p) parts.push(p.name||''); } } }
+  var at=it.attrs||{};
+  Object.keys(at).forEach(function(k){ var v=at[k]; if(v!==null&&v!==undefined) parts.push(String(v)); });
+  return parts.join(' ').toLowerCase();
+}
+function qpMatches(it,toks){
+  var t=qpSearchText(it);
+  for(var i=0;i<toks.length;i++){ if(t.indexOf(toks[i])<0) return false; }
+  return true;
+}
+function qpItemRow(it){
+  var q=qpQty[it.id]||1;
+  return '<div style="display:flex;align-items:center;gap:7px;padding:8px 0;border-bottom:1px solid var(--line)">'
+    +'<div style="flex:1;min-width:0"><b>'+esc(it.name)+'</b>'+(it.unit?' <span class="mut">'+esc(it.unit)+'</span>':'')
+    +'<div class="mut" style="font-size:12px">'+esc(qpPathFor(it))+'</div></div>'
+    +'<button type="button" class="btn sec sml" aria-label="Less" onclick="qpStep(\''+it.id+'\',-1)">\u2212</button>'
+    +'<input type="number" id="qp_qty_'+it.id+'" min="1" step="1" inputmode="numeric" value="'+q+'" aria-label="Quantity" onchange="qpQtyCommit(\''+it.id+'\',this)" style="width:58px;text-align:center;padding:7px 4px;margin:0">'
+    +'<button type="button" class="btn sec sml" aria-label="More" onclick="qpStep(\''+it.id+'\',1)">+</button>'
+    +'<button type="button" class="btn sml" onclick="qpAdd(\''+it.id+'\')">Add</button></div>';
+}
+function qpResultsHTML(){
+  var q=qpQuery.trim();
+  if(!q) return '';
+  var toks=q.toLowerCase().split(/\s+/).filter(function(t){ return t; });
+  var hits=catalogItems.filter(function(it){ return qpMatches(it,toks); });
+  if(!hits.length)
+    return '<p class="mut" style="margin:4px 0 2px">No matches \u2014 add it below as a one-off; it can be filed into the catalog from Manage.</p>';
+  var h=hits.slice(0,30).map(qpItemRow).join('');
+  if(hits.length>30) h+='<p class="mut" style="margin-top:8px">'+hits.length+' matches \u2014 keep typing to narrow it down.</p>';
+  return h;
+}
+function catalogPicksHTML(p){
+  var h='<div class="card"><h3>Quick picks</h3>';
+  if(!catalogItems.length)
+    return h+'<p class="mut">No catalog items yet \u2014 build your catalog in Manage.</p></div>';
+  h+='<input type="search" id="qp_q" placeholder="Search the catalog\u2026" value="'+esc(qpQuery)+'" oninput="qpSearch(this.value)" autocomplete="off" style="margin-bottom:2px">'
+    +'<div id="qp_results">'+qpResultsHTML()+'</div>';
+  return h+'</div>';
+}
+function qpSearch(v){
+  qpQuery=v;
+  var el=document.getElementById('qp_results');
+  if(el) el.innerHTML=qpResultsHTML();
+}
+function qpParseQty(v){
+  var s=String(v===null||v===undefined?'':v).trim();
+  if(!/^\d+$/.test(s)) return 1;
+  var n=parseInt(s,10);
+  return n>=1?n:1;
+}
+function qpQtyOf(id){
+  var inp=document.getElementById('qp_qty_'+id);
+  if(inp) return qpParseQty(inp.value);
+  return qpQty[id]||1;
+}
+function qpQtyCommit(id,el){ var q=qpParseQty(el?el.value:''); qpQty[id]=q; if(el) el.value=q; }
+function qpStep(id,d){
+  var q=qpQtyOf(id)+d; if(q<1)q=1; qpQty[id]=q;
+  var inp=document.getElementById('qp_qty_'+id); if(inp) inp.value=q;
+}
+function qpAdd(id){
+  var it=catalogItems.filter(function(x){ return x.id===id; })[0]; if(!it) return;
+  var q=qpQtyOf(id), unit=it.unit||'each';
+  data.materials.push({id:uid(),projectId:view.id,createdAt:Date.now(),name:it.name,qty:q,unit:unit,notes:''});
+  learnMatPick(it.name,unit);
+  qpQty[id]=1;
+  save(); render(); toast('Added '+it.name+' \u00d7 '+q);
+}
 /* ============ DASHBOARD ============ */
 function fmtFeedTime(t){return new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}
 function fmtFeedRange(e){ var s=new Date(e.startISO),en=e.endISO?new Date(e.endISO):null; if(isNaN(s))return ''; var f=function(d){return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}; if(!en||isNaN(en)||en<=s)return f(s); var sm=f(s),em=f(en); if(sm.slice(-2)===em.slice(-2)&&/AM|PM/.test(sm.slice(-2)))sm=sm.slice(0,-3); return sm+'\u2013'+em; }
@@ -3119,7 +3161,7 @@ function renderActivity(){
   var h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3>Activity log</h3><div class="seg">'
     +'<button type="button" class="'+(actCrew?'':'act')+'" onclick="setActFeed(false)">Mine</button>'
     +'<button type="button" class="'+(actCrew?'act':'')+'" onclick="setActFeed(true)">Crew</button></div></div>';
-  if(!ev.length)h+='<p class="mut">Nothing yet \u2014 log time, cable or materials and it will show up here.</p>';
+  if(!ev.length)h+='<p class="mut">Nothing yet \u2014 log time or materials and it will show up here.</p>';
   var days={},order=[];
   ev.forEach(function(it){
     var k=dayOfTs(it.t)||'Undated';
@@ -3241,6 +3283,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.12',items:['Cable is a regular material now: the Cable tab is retired, and pulls already logged stay on their job as a read-only history list','Materials: Quick picks from the company catalog \u2014 search the catalog, set or type a quantity, tap to log','ConnectWise Notes: the CABLE section appears only on jobs that have cable pulls','New Materials icon \u2014 the parts tote']},
  {v:'5.11',items:['Design polish: status badges, form labels and shadows now match the Field Kit Manage family look','One button style retired \u2014 a single red for destructive actions']},
  {v:'5.10',items:['The Admin area has been removed — users, cable options, the recycle bin and project repairs now live in Field Kit Manage','The Live Tech Radar retired along with it','New on phones: Install app in the three-dot menu — add Field Kit to your home screen from inside the app','Cable type and color lists now load at sign-in, so edits made in Manage reach the app on their own']},
  {v:'5.9.1',items:['On desktop, your company name and logo (set in Field Kit Manage) now take over the sidebar and header branding \u2014 the phone layout is unchanged']},
@@ -3470,7 +3513,6 @@ function bootAuth(){
 
 function onSignedIn(session,keepView){
   sbUser=session.user;
-  loadCableOptions();
   if(!keepView){ view={name:'dashboard'}; curTab='overview'; }
   else if(view.name==='login'){ view={name:'dashboard'}; }
   $('app').innerHTML=loadingHTML();
@@ -3487,7 +3529,7 @@ function initialLoad(){
   $('app').innerHTML=loadingHTML();
   setSyncStatus('refreshing');
   migrateLocalOnce().then(function(){ return fetchAllFromServer(); }).then(function(){
-    var jobs=[loadPrefs(),loadOwnTimer()];
+    var jobs=[loadPrefs(),loadOwnTimer(),loadCatalog()];
     return Promise.all(jobs);
   }).then(function(){
     setSyncStatus('ok');
