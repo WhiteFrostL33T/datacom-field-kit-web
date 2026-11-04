@@ -300,6 +300,8 @@ th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
 }
 #timerbar.show{display:flex;align-items:center;gap:12px;}
 #timerbar .el{font-family:'JetBrains Mono',monospace;font-weight:700;color:#fcd34d;}
+#demoBar{position:fixed;left:12px;bottom:86px;z-index:58;display:flex;align-items:center;gap:10px;background:#78350f;color:#fef3c7;border:1px solid #f59e0b;border-radius:999px;padding:6px 6px 6px 14px;font-size:.78rem;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+#demoBar button{background:#f59e0b;color:#1c1005;border:none;border-radius:999px;padding:5px 12px;font-weight:700;font-size:.74rem;cursor:pointer}
 
 #toast{
   position:fixed;left:50%;bottom:96px;transform:translateX(-50%);
@@ -969,7 +971,8 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.15';
+var APP_VERSION='5.16';
+var DEMO=/[?&]demo\b/.test(location.search); // v5.16: sign-in-free demo mode (?demo) — see the demo block before the auth section
 var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -982,6 +985,7 @@ function defaultData(){return {projects:[],timeEntries:[],timer:null,pulls:[],
 var data=defaultData();
 var ioChain=Promise.resolve();
 function save(){
+  if(DEMO){ demoPersist(); return; } // v5.16: demo writes stay in the demo sandbox
   // v5.3 Phase A: a failed push no longer discards local edits. The change
   // stays in memory, the header shows how many changes are pending, and the
   // push retries when the device comes back online (see the 'online'
@@ -1216,6 +1220,7 @@ function renderBreadcrumb(){
 function updateSyncBadge(){
   var badge=$('syncBadge'), dot=$('syncBadgeDot'), txt=$('syncBadgeText');
   if(!badge||!dot) return;
+  if(DEMO){ badge.className='sbadge telemetry-pending'; dot.style.background='#fbbf24'; if(txt) txt.textContent='Demo'; return; } // v5.16
   if(syncStatus==='refreshing'){
     badge.className='telemetry-pill telemetry-refreshing';
     dot.className='telemetry-dot dot-refreshing';
@@ -3609,6 +3614,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.16',items:['New: a sign-in-free demo \u2014 tap \u201cView the demo\u201d on the sign-in screen (or add ?demo to the address) to explore Field Kit with sample data. Nothing in the demo is saved or synced']},
  {v:'5.15',items:['Ports live in Network now on jobs that belong to a site \u2014 the separate Ports tab is retired there, and switch ports open from the racks they sit in','The Network card shows on every site job, even before any rooms are designed, and a site switch can be added right there','A job\u2019s own switches are listed in Network too, with the same port screen and delete as before']},
  {v:'5.14',items:['Network: cable trays, wall panels and doors placed in Field Kit Manage now show on the room map too, with a small legend \u2014 still view-only here','Network rooms on the overview now note how many trays and panels each room has']},
  {v:'5.13',items:['New: Network \u2014 the network rooms and racks at a job\u2019s site, right on the project overview. View-only here; the layout itself is managed in Field Kit Manage','Port log: the site\u2019s switches now come first, with their room and rack \u2014 their port map is shared by every job at the site, and ports stay editable here','A switch added on a job at a site now belongs to the site and starts unplaced, ready to be given a rack in Manage. Switches that belong to a single job are unchanged']},
@@ -3817,8 +3823,168 @@ function loadCompanyBrand(){
     },function(){ /* network failure: keep the cached state */ });
   }catch(e){}
 }
+/* ---------- demo mode (v5.16) ----------
+   Sign-in-free exploration, mirroring Field Kit Manage's demo:
+   ?demo in the address (or the sign-in screen's "View the demo"
+   link) boots the app on the fictional seed below. No Supabase
+   client is created, no session is read, and nothing is fetched
+   or pushed: save() routes here (demoPersist — one dedicated
+   localStorage key), every loader no-ops without a client, and
+   realtime is never subscribed. Exit demo wipes the key and
+   reloads without ?demo. The signed-in path is untouched. */
+var DEMO_KEY='fk_demo_state';
+var DEMO_USER_ID='demo-tech';
+var demoNotifSeen=null;
+var DEMO_CATS=[
+  {id:'demo-cat-data',name:'Data',parent_id:null,sort:1},
+  {id:'demo-cat-patch',name:'Patch Cables',parent_id:'demo-cat-data',sort:1},
+  {id:'demo-cat-cable',name:'Cable',parent_id:'demo-cat-data',sort:2},
+  {id:'demo-cat-hw',name:'Hardware',parent_id:'demo-cat-data',sort:3}
+];
+var DEMO_ITEMS=[
+  {id:'demo-item-pc3',name:'Patch Cable · Cat6A · 3 ft · Blue',unit:'each',category_id:'demo-cat-patch',attrs:{Type:'Cat6A',Length:'3 ft',Color:'Blue'}},
+  {id:'demo-item-pc7',name:'Patch Cable · Cat6A · 7 ft · Blue',unit:'each',category_id:'demo-cat-patch',attrs:{Type:'Cat6A',Length:'7 ft',Color:'Blue'}},
+  {id:'demo-item-pc10',name:'Patch Cable · Cat6A · 10 ft · White',unit:'each',category_id:'demo-cat-patch',attrs:{Type:'Cat6A',Length:'10 ft',Color:'White'}},
+  {id:'demo-item-cb6a',name:'Cable · Cat6A · Blue',unit:'ft',category_id:'demo-cat-cable',attrs:{Type:'Cat6A',Color:'Blue'}},
+  {id:'demo-item-cb6',name:'Cable · Cat6 · White',unit:'ft',category_id:'demo-cat-cable',attrs:{Type:'Cat6',Color:'White'}},
+  {id:'demo-item-kj',name:'Keystone Jack · Cat6A · White',unit:'each',category_id:'demo-cat-hw',attrs:{Type:'Cat6A',Color:'White'}},
+  {id:'demo-item-pp24',name:'Patch Panel · 24-port',unit:'each',category_id:'demo-cat-hw',attrs:{Ports:'24-port'}}
+];
+function demoDay(daysOff){var d=new Date();d.setDate(d.getDate()+daysOff);var p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
+function demoAt(daysOff,hh,mm){var d=new Date();d.setDate(d.getDate()+daysOff);d.setHours(hh,mm,0,0);return toLocalInput(d);}
+function demoSeed(){
+  var d=defaultData();
+  var now=Date.now();
+  d.projects=[
+    {id:'demo-job-site',name:'Plant 2 — MDF Buildout',customer:'Bluepeak Foods',site:'Plant 2',ticket:'1042',
+     notes:'New MDF for the packaging expansion. Tray runs sit above the racks; this site\u2019s switch ports are shared by every job here.',
+     status:'active',enabledModules:allModuleKeys(),schedStart:demoDay(-3),schedEnd:demoDay(11),
+     siteId:'demo-site-plant2',customerId:'demo-cust-bluepeak',owner_id:DEMO_USER_ID,technicians:[],createdAt:now-3*864e5},
+    {id:'demo-job-field',name:'Depot Camera Refresh',customer:'Bluepeak Foods',site:'North Depot',ticket:'1047',
+     notes:'',status:'active',enabledModules:allModuleKeys(),schedStart:demoDay(-1),schedEnd:demoDay(6),
+     siteId:null,customerId:'demo-cust-bluepeak',owner_id:DEMO_USER_ID,technicians:[],createdAt:now-864e5}
+  ];
+  function te(id,pid,kind,off,sh,sm,eh,em,notes,lunch){
+    var s=demoAt(off,sh,sm), e=demoAt(off,eh,em);
+    return {id:id,projectId:pid,kind:kind,startISO:s,endISO:e,notes:notes,source:'manual',userId:DEMO_USER_ID,lunchMin:lunch||0,createdAt:new Date(s).getTime()};
+  }
+  d.timeEntries=[
+    te('demo-te-1','demo-job-site','Drive',0,7,10,7,55,'Drive to Plant 2'),
+    te('demo-te-2','demo-job-site','On site',0,8,0,11,30,'Tray runs and the Rack A build-out'),
+    te('demo-te-3','demo-job-site','Shop',0,6,15,6,45,'Picked up patch panels and keystone jacks'),
+    te('demo-te-4','demo-job-site','On site',-2,8,0,16,30,'Pulled backbone cable to Rack B',30),
+    te('demo-te-5','demo-job-site','Remote',-2,17,0,18,0,'Programmed SW-CORE-1 port descriptions'),
+    te('demo-te-6','demo-job-field','On site',-1,9,0,11,30,'Swapped two dock cameras')
+  ];
+  d.materials=[
+    {id:'demo-mat-1',projectId:'demo-job-site',name:'Patch Cable · Cat6A · 7 ft · Blue',qty:12,unit:'each',notes:'',createdAt:now-2*36e5},
+    {id:'demo-mat-2',projectId:'demo-job-site',name:'Cable · Cat6A · Blue',qty:250,unit:'ft',notes:'Backbone to Rack B',createdAt:now-2*864e5},
+    {id:'demo-mat-3',projectId:'demo-job-site',name:'Blank keystone inserts',qty:10,unit:'each',notes:'One-off \u2014 not in the catalog yet',createdAt:now-2*864e5},
+    {id:'demo-mat-4',projectId:'demo-job-field',name:'Patch Cable · Cat6A · 3 ft · Blue',qty:4,unit:'each',notes:'',createdAt:now-864e5}
+  ];
+  d.matPicks=[{name:'Patch Cable · Cat6A · 7 ft · Blue',unit:'each'},{name:'Cable · Cat6A · Blue',unit:'ft'}];
+  d.pulls=[
+    {id:'demo-pull-1',projectId:'demo-job-field',run:'Cat6A',box:'Blue',boxSize:'1000 ft',mode:'markings',prev:'1000',newest:'640',marking:'',used:360,date:demoDay(-1),createdAt:now-864e5}
+  ];
+  d.storageCalcs={'demo-job-site':{cameras:24,bitrate:6,hours:24,days:30,availTB:'20'}};
+  d.poeSwitches=[{id:'demo-poe-1',projectId:'demo-job-site',name:'SW-CORE-1',budget:370,createdAt:now-2*864e5}];
+  d.poeDevices=[
+    {id:'demo-poe-d1',switchId:'demo-poe-1',name:'Dome camera',watts:12.5,qty:14,createdAt:now-2*864e5},
+    {id:'demo-poe-d2',switchId:'demo-poe-1',name:'PTZ camera',watts:25,qty:2,createdAt:now-2*864e5},
+    {id:'demo-poe-d3',switchId:'demo-poe-1',name:'Wireless AP',watts:14,qty:4,createdAt:now-2*864e5}
+  ];
+  d.ipSubnets={'demo-job-site':'192.168.20.0/24'};
+  d.ipAssignments=[
+    {id:'demo-ip-1',projectId:'demo-job-site',ip:'192.168.20.10',device:'NVR-1',notes:'Rack A',createdAt:now-2*864e5},
+    {id:'demo-ip-2',projectId:'demo-job-site',ip:'192.168.20.11',device:'SW-CORE-1',notes:'',createdAt:now-2*864e5},
+    {id:'demo-ip-3',projectId:'demo-job-site',ip:'192.168.20.101',device:'Camera \u2014 dock wide',notes:'',createdAt:now-2*864e5}
+  ];
+  d.portSwitches=[
+    {id:'demo-sw-core',projectId:'',siteId:'demo-site-plant2',name:'SW-CORE-1',createdAt:now-2*864e5},
+    {id:'demo-sw-idf',projectId:'',siteId:'demo-site-plant2',name:'SW-IDF-1',createdAt:now-2*864e5},
+    {id:'demo-sw-spare',projectId:'',siteId:'demo-site-plant2',name:'SW-SPARE-1',createdAt:now-864e5},
+    {id:'demo-sw-legacy',projectId:'demo-job-site',siteId:null,name:'Closet SW',createdAt:now-2*864e5},
+    {id:'demo-sw-depot',projectId:'demo-job-field',siteId:null,name:'Depot SW-1',createdAt:now-864e5}
+  ];
+  function pe(id,sw,port,dev,jack,notes){return {id:id,switchId:sw,port:String(port),device:dev,jack:jack||'',notes:notes||'',createdAt:now-864e5};}
+  d.portEntries=[
+    pe('demo-pe-1','demo-sw-core',1,'NVR-1','PP-1 \u00b7 1'),
+    pe('demo-pe-2','demo-sw-core',2,'Camera \u2014 dock wide','PP-1 \u00b7 2'),
+    pe('demo-pe-3','demo-sw-core',3,'Camera \u2014 dock narrow','PP-1 \u00b7 3'),
+    pe('demo-pe-4','demo-sw-core',24,'Uplink \u2014 SW-IDF-1','','Fiber \u2014 OM4'),
+    pe('demo-pe-5','demo-sw-idf',1,'Uplink \u2014 SW-CORE-1',''),
+    pe('demo-pe-6','demo-sw-idf',5,'Workstation \u2014 line office','IDF \u00b7 5'),
+    pe('demo-pe-7','demo-sw-spare',1,'Staged \u2014 not in service',''),
+    pe('demo-pe-8','demo-sw-legacy',1,'Printer \u2014 office',''),
+    pe('demo-pe-9','demo-sw-legacy',2,'Time clock',''),
+    pe('demo-pe-10','demo-sw-depot',1,'Camera \u2014 yard north',''),
+    pe('demo-pe-11','demo-sw-depot',2,'Camera \u2014 yard south',''),
+    pe('demo-pe-12','demo-sw-depot',8,'Office PC','')
+  ];
+  var net={
+    rooms:[{id:'demo-room-mdf',site_id:'demo-site-plant2',name:'MDF',width_ft:14,depth_ft:10,sort:1,deleted_at:null}],
+    racks:[
+      {id:'demo-rack-a',room_id:'demo-room-mdf',name:'Rack A',height_u:42,map_x:1,map_y:1,map_rot:0,fp_w:3,fp_d:2,sort:1,deleted_at:null},
+      {id:'demo-rack-b',room_id:'demo-room-mdf',name:'Rack B',height_u:24,map_x:5,map_y:1,map_rot:0,fp_w:3,fp_d:2,sort:2,deleted_at:null}
+    ],
+    devices:[
+      {id:'demo-dev-ups',rack_id:'demo-rack-a',type:'ups',name:'UPS-3000',u_start:1,u_size:2,switch_id:null,note:'',sort:0,deleted_at:null},
+      {id:'demo-dev-nvr',rack_id:'demo-rack-a',type:'nvr_server',name:'NVR-1',u_start:3,u_size:2,switch_id:null,note:'',sort:0,deleted_at:null},
+      {id:'demo-dev-core',rack_id:'demo-rack-a',type:'switch',name:'SW-CORE-1',u_start:40,u_size:1,switch_id:'demo-sw-core',note:'',sort:0,deleted_at:null},
+      {id:'demo-dev-pp',rack_id:'demo-rack-a',type:'patch_panel',name:'PP-1',u_start:41,u_size:1,switch_id:null,note:'',sort:0,deleted_at:null},
+      {id:'demo-dev-pdu',rack_id:'demo-rack-b',type:'pdu',name:'PDU',u_start:1,u_size:1,switch_id:null,note:'',sort:0,deleted_at:null},
+      {id:'demo-dev-idf',rack_id:'demo-rack-b',type:'switch',name:'SW-IDF-1',u_start:24,u_size:1,switch_id:'demo-sw-idf',note:'',sort:0,deleted_at:null}
+    ],
+    items:[
+      {id:'demo-item-tray',room_id:'demo-room-mdf',type:'cable_tray',name:'Tray \u2014 over racks',map_x:0.5,map_y:0.6,map_rot:0,size_w:9,size_d:1.5,layer:'above',sort:1,deleted_at:null},
+      {id:'demo-item-panel',room_id:'demo-room-mdf',type:'wall_panel',name:'Panel \u2014 west wall',map_x:0,map_y:4.5,map_rot:90,size_w:4,size_d:0.5,layer:'below',sort:2,deleted_at:null},
+      {id:'demo-item-door',room_id:'demo-room-mdf',type:'door',name:'Entry door',map_x:5.5,map_y:7,map_rot:180,size_w:3,size_d:null,door_swing:'in',door_hinge:'left',layer:'below',sort:3,deleted_at:null}
+    ]
+  };
+  return {data:d,net:net};
+}
+function demoPersist(){
+  try{ localStorage.setItem(DEMO_KEY,JSON.stringify({v:1,data:data,net:{rooms:netRooms,racks:netRacks,devices:netDevices,items:netItems}})); }catch(e){}
+}
+function demoLoad(){
+  try{
+    var raw=localStorage.getItem(DEMO_KEY); if(!raw) return null;
+    var o=JSON.parse(raw);
+    if(o&&o.data&&o.data.projects&&o.data.projects.length&&o.net&&o.net.rooms) return o;
+  }catch(e){}
+  return null;
+}
+function bootDemo(){
+  var seed=demoLoad()||demoSeed();
+  data=seed.data;
+  netRooms=seed.net.rooms; netRacks=seed.net.racks; netDevices=seed.net.devices; netItems=seed.net.items;
+  catalogCats=DEMO_CATS.slice(); catalogItems=DEMO_ITEMS.slice();
+  sbUser={id:DEMO_USER_ID,email:'demo@example.com'};
+  authorLabels={}; authorLabels[DEMO_USER_ID]='Demo Tech';
+  memberCache={};
+  data.projects.forEach(function(p){
+    var labels={}; labels[DEMO_USER_ID]='Demo Tech';
+    memberCache[p.id]={labels:labels,ownerId:DEMO_USER_ID,ownerLabel:'Demo Tech',members:[]};
+  });
+  view={name:'dashboard'}; delete view.id; curTab='overview';
+  showDemoBar();
+  render(); renderTimerBar();
+  demoPersist();
+}
+function showDemoBar(){
+  if(document.getElementById('demoBar'))return;
+  var b=document.createElement('div'); b.id='demoBar';
+  b.innerHTML='<span><b>DEMO</b> \u00b7 sample data \u2014 nothing is saved</span><button type="button" onclick="exitDemo()">Exit demo</button>';
+  document.body.appendChild(b);
+}
+function exitDemo(){
+  try{ localStorage.removeItem(DEMO_KEY); }catch(e){}
+  location.href=location.pathname;
+}
+
 /* ---------- auth ---------- */
 function bootAuth(){
+  if(DEMO){ bootDemo(); return; } // v5.16
   if(!sbReady){ render(); return; }
   pendingView={name:view.name,id:view.id||null,tab:curTab};
   view={name:'login'}; render();
@@ -3934,7 +4100,9 @@ function renderLogin(){
     +'<input id="li_email" type="email" autocomplete="username" style="width:100%;margin:4px 0 10px">'
     +'<label class="mut" style="font-size:.8rem">Password</label>'
     +'<input id="li_pass" type="password" autocomplete="current-password" style="width:100%;margin:4px 0 16px" onkeydown="if(event.key===\'Enter\')doLogin()">'
-    +'<button class="btn pri" style="width:100%" onclick="doLogin()">Sign in</button></div>';
+    +'<button class="btn pri" style="width:100%" onclick="doLogin()">Sign in</button>'
+    +'<div style="text-align:center;margin-top:18px"><a href="?demo" style="color:var(--acc);font-weight:600;text-decoration:none">View the demo</a>'
+    +'<div class="mut" style="font-size:.76rem;margin-top:4px">Sample data \u2014 no sign-in, nothing is saved</div></div></div>';
 }
 
 /* ---------- sync engine ---------- */
@@ -4374,6 +4542,7 @@ function queueRefresh(){
   refreshTimer=setTimeout(function(){ refreshTimer=null; refreshFromServer(false); },1500);
 }
 function refreshFromServer(manual){
+  if(DEMO){ if(manual) toast('Demo mode \u2014 sample data only'); return Promise.resolve(false); } // v5.16
   // All fetches run through the ioChain so a refresh can never prune rows
   // from a save that is still in flight.
   // v5.3 Phase A: never refresh while changes are pending -- a fetch would
@@ -4395,6 +4564,7 @@ function refreshFromServer(manual){
   return ioChain;
 }
 function subscribeRealtime(){
+  if(DEMO) return; // v5.16: demo never subscribes
   if(rtChannel||!sb||!sbUser) return;
   try{
     rtChannel=sb.channel('fk-sync-'+sbUser.id);
@@ -4505,6 +4675,7 @@ function renderHdrMenu(){
     else h+='<button onclick="fkInstallClick()">Install app</button>';
   }
   h+='<button onclick="goAbout()">About</button>';
+  if(DEMO) h+='<div class="mdiv"></div><button onclick="exitDemo()">Exit demo</button>'; // v5.16
   if(sbReady&&sbUser){
     h+='<button onclick="openDiag()">Diagnostics</button>'
       +'<div class="mdiv"></div>'
@@ -4517,6 +4688,7 @@ function renderHdrMenu(){
 var notifSnapshot=null;
 function notifKey(){ return 'fk_notif_seen_v1_'+(sbUser?sbUser.id:'anon'); }
 function notifStore(){
+  if(DEMO){ if(!demoNotifSeen) demoNotifSeen={seenTs:Date.now(),seenDay:''}; return demoNotifSeen; } // v5.16
   var raw=null; try{ raw=localStorage.getItem(notifKey()); }catch(e){}
   if(raw){ try{ var o=JSON.parse(raw); if(o&&o.seenTs) return o; }catch(e){} }
   var init={seenTs:Date.now(),seenDay:''};
@@ -4524,6 +4696,7 @@ function notifStore(){
   return init;
 }
 function notifMarkRead(){
+  if(DEMO){ demoNotifSeen={seenTs:Date.now(),seenDay:todayStr(0)}; return; } // v5.16
   try{ localStorage.setItem(notifKey(),JSON.stringify({seenTs:Date.now(),seenDay:todayStr(0)})); }catch(e){}
 }
 function computeNotifications(){
@@ -4690,8 +4863,7 @@ function removeMember(uid2){
 }
 
 /* ============ init ============ */
-initSupabase();
-loadCompanyBrand();
+if(!DEMO){ initSupabase(); loadCompanyBrand(); } // v5.16: demo skips the client entirely
 (function(){
   /* the Dashboard is the default landing view on every load (v4.3) */
   view={name:'dashboard'};delete view.id;curTab='overview';
