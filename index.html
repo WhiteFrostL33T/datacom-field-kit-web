@@ -969,7 +969,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.14';
+var APP_VERSION='5.15';
 var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -1053,6 +1053,7 @@ function toast(msg){var t=$('toast');if(!t)return;t.textContent=msg;t.className=
 function projById(id){return data.projects.filter(function(p){return p.id===id;})[0]||null;}
 function enabledMods(p){var m=(p.enabledModules&&p.enabledModules.length)?p.enabledModules.slice():allModuleKeys();
   m=m.filter(function(k){return allModuleKeys().indexOf(k)>=0;}); // v5.12: retired module keys stored on a project are ignored
+  if(p&&p.siteId)m=m.filter(function(k){return k!=='ports';}); // v5.15: on a site job the Ports module retires \u2014 switch ports live in the Network view
   ALWAYS_ON.forEach(function(k){if(m.indexOf(k)<0)m.push(k);});return m;}
 function fmtH(min){if(!isFinite(min))min=0;return (Math.round(min)/60).toFixed(2).replace(/\.?0+$/,'')+' h';}
 function fmtHM(min){min=Math.round(min);var h=Math.floor(min/60),m=min%60;
@@ -2394,7 +2395,7 @@ function openModuleDialog(){
   var p=projById(view.id);if(!p)return;
   closeModuleDialog();
   var mods=enabledMods(p);
-  var rows=MODULES.map(function(m){
+  var rows=MODULES.filter(function(m){return !(p.siteId&&m[0]==='ports');}).map(function(m){
     var locked=ALWAYS_ON.indexOf(m[0])>=0;
     var on=locked||mods.indexOf(m[0])>=0;
     return '<div class="switch"><span>'+esc(m[1])+(locked?' <span class="mut">(always on)</span>':'')+'</span><span class="tgl"><input type="checkbox"'
@@ -2403,6 +2404,7 @@ function openModuleDialog(){
   ov.className='dlg-ov';ov.id='modDlg';
   ov.innerHTML='<div class="dlg"><div class="cardhd"><h3>Modules</h3><button class="dlg-x" aria-label="Close" onclick="closeModuleDialog()">\u00d7</button></div>'
     +'<p class="mut" style="margin-top:0">Sections for this project. Turning a module off hides its tab — its data is kept.</p>'
+    +(p.siteId?'<p class="mut">Ports are part of the Network section on site jobs.</p>':'')
     +rows
     +'<button class="btn pri" style="width:100%;margin-top:12px" onclick="closeModuleDialog()">Done</button></div>';
   ov.addEventListener('click',function(e){if(e.target===ov)closeModuleDialog();});
@@ -2629,7 +2631,12 @@ function cableHistoryHTML(p){
    switch (the same port_entries the port log has always kept), and
    ports stay fully editable. Loaded at sign-in alongside the
    catalog; if the tables are not there, everything below simply
-   stays empty and the rest of the app is untouched. */
+   stays empty and the rest of the app is untouched.
+   v5.15: on a site job this view is also the one door to switch
+   ports \u2014 the standalone Ports module retires there; site
+   switches can be added here (unplaced), and the job's own
+   legacy project switches are listed here too, opening the
+   same port screen in project flavor (no site banner). */
 var netRooms=[], netRacks=[], netDevices=[], netItems=[];
 var netRoomId=null, netRackId=null, netSwId=null, netFromLog=false;
 var NET_TYPES=[['switch','Switch'],['patch_panel','Patch panel'],['ups','UPS'],['nvr_server','NVR / Server'],['router_firewall','Router / Firewall'],['pdu','PDU'],['cable_manager','Cable manager'],['blank','Blank'],['other','Other']];
@@ -2656,6 +2663,10 @@ function netRoomsOf(siteId){if(!siteId)return [];return netRooms.filter(function
 function netRacksOf(roomId){return netRacks.filter(function(r){return r.room_id===roomId&&!r.deleted_at;}).sort(netSortName);}
 function netDevsOf(rackId){return netDevices.filter(function(d){return d.rack_id===rackId&&!d.deleted_at;});}
 function netItemsOf(roomId){return netItems.filter(function(it){return it.room_id===roomId&&!it.deleted_at;}).sort(netSortName);}
+function netItemAbove(it){ // v5.15: room_items.layer (set in Manage) \u2014 'above' stacks over the rack blocks, 'below' stays under them; no stored layer: trays default above, panels and doors below
+  if(it.layer==='above')return true;
+  if(it.layer==='below')return false;
+  return it.type==='cable_tray';}
 function netUsedU(rackId){return netDevsOf(rackId).reduce(function(n,d){return n+(d.u_size||1);},0);}
 function netSiteSwitches(siteId){if(!siteId)return [];return data.portSwitches.filter(function(s){return s.siteId===siteId;}).sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});}
 function netPlacementOf(swId){
@@ -2667,17 +2678,19 @@ function netPlacementOf(swId){
   return null;
 }
 function netHasContent(p){
+  if(p&&p.siteId)return true;
   if(netRoomsOf(p.siteId).length)return true;
   if(netSwId){for(var i=0;i<data.portSwitches.length;i++)if(data.portSwitches[i].id===netSwId&&data.portSwitches[i].siteId&&data.portSwitches[i].siteId===p.siteId)return true;}
   return false;
 }
 function networkCardHTML(p){
+  if(!p||!p.siteId)return '';
   var rooms=netRoomsOf(p.siteId);
-  if(!rooms.length)return '';
   var nRacks=0;
   rooms.forEach(function(r){nRacks+=netRacksOf(r.id).length;});
   var h='<div class="card"><div class="cardhd"><h3>Network</h3></div>'
     +'<p class="mut">Network rooms at '+esc(p.site||'this site')+' \u2014 the layout is managed in Manage; here it is view-only, and switch ports stay editable.</p>'
+    +(rooms.length?'':'<div class="kv"><span>No network rooms yet at '+esc(p.site||'this site')+' \u2014 rooms are designed in Manage.</span><button class="btn sec sml" style="flex:0 0 auto" onclick="netOpenNetwork()">View \u203a</button></div>')
     +rooms.map(function(r){
       var rk=netRacksOf(r.id);
       var its=netItemsOf(r.id);
@@ -2689,6 +2702,7 @@ function networkCardHTML(p){
   return h;
 }
 function netOpenRoom(roomId){netRoomId=roomId;netRackId=null;netSwId=null;netFromLog=false;curTab='network';render();window.scrollTo(0,0);}
+function netOpenNetwork(){netRoomId=null;netRackId=null;netSwId=null;netFromLog=false;curTab='network';render();window.scrollTo(0,0);}
 function netPickRoom(roomId){netRoomId=roomId;netRackId=null;render();window.scrollTo(0,0);}
 function netOpenRack(rackId){var r=netRackById(rackId);if(!r)return;netRackId=rackId;netRoomId=r.room_id;netSwId=null;render();window.scrollTo(0,0);}
 function netOpenPorts(swId,fromLog){netSwId=swId;netFromLog=!!fromLog;if(fromLog)curTab='network';render();window.scrollTo(0,0);}
@@ -2702,6 +2716,7 @@ function networkHTML(p){
     var sw=null;
     for(var i=0;i<data.portSwitches.length;i++)if(data.portSwitches[i].id===netSwId)sw=data.portSwitches[i];
     if(sw&&sw.siteId&&sw.siteId===p.siteId)return netPortsHTML(p,sw);
+    if(sw&&!sw.siteId&&sw.projectId===p.id)return netPortsHTML(p,sw);
     netSwId=null;
   }
   if(netRackId){
@@ -2738,7 +2753,7 @@ function netRoomsHTML(p){
   var room=netRoomId?netRoomById(netRoomId):null;
   var h='<button class="btn sec sml" onclick="netBack()">\u2039 Overview</button>'
     +modHero(p,'Network',rooms.length+' room'+(rooms.length===1?'':'s'));
-  if(!room){h+='<div class="card"><p class="mut">No network rooms at this site yet. Rooms and racks are set up in Manage.</p></div>';return h;}
+  if(!room){h+='<div class="card"><p class="mut">No network rooms yet at '+esc(p.site||'this site')+' \u2014 rooms are designed in Manage.</p></div>';}else{
   h+='<div class="net-chips">'+rooms.map(function(r){return '<button type="button" class="net-chip'+(r.id===room.id?' on':'')+'" onclick="netPickRoom(\''+r.id+'\')">'+esc(r.name)+'</button>';}).join('')+'</div>';
   var racks=netRacksOf(room.id);
   var w=Number(room.width_ft)||14, d=Number(room.depth_ft)||10;
@@ -2746,6 +2761,7 @@ function netRoomsHTML(p){
     +'<div class="kv" style="margin:6px 0 10px"><span class="mut">'+w+' ft \u2014 '+Math.round(w*12)+' in</span><span class="mut">'+d+' ft deep</span></div>'
     +'<div class="net-map" style="aspect-ratio:'+w+'/'+d+';background-size:'+(50/w)+'% '+(50/d)+'%;background-image:linear-gradient(rgba(255,255,255,0.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.045) 1px,transparent 1px)">';
   netItemsOf(room.id).forEach(function(it){
+    if(netItemAbove(it))return; // v5.15: 'above' items draw in a second pass, over the racks
     if(it.type==='door'){h+=netDoorHTML(it,w,d);return;}
     var irot=((it.map_rot||0)%180)!==0;
     var iw=irot?Number(it.size_d):Number(it.size_w), ih=irot?Number(it.size_w):Number(it.size_d);
@@ -2758,6 +2774,14 @@ function netRoomsHTML(p){
     h+='<button type="button" class="net-rack" onclick="netOpenRack(\''+r.id+'\')" style="left:'+(Number(r.map_x)/w*100)+'%;top:'+(Number(r.map_y)/d*100)+'%;width:'+(fw/w*100)+'%;height:'+(fd/d*100)+'%">'
       +'<span class="rnm">'+esc(r.name)+'</span><span class="rsub">'+(r.height_u||42)+'U \u00b7 '+netDevsOf(r.id).length+' devices</span></button>';
   });
+  netItemsOf(room.id).forEach(function(it){
+    if(!netItemAbove(it))return;
+    if(it.type==='door'){h+=netDoorHTML(it,w,d);return;}
+    var irot=((it.map_rot||0)%180)!==0;
+    var iw=irot?Number(it.size_d):Number(it.size_w), ih=irot?Number(it.size_w):Number(it.size_d);
+    h+='<div class="net-item '+(it.type==='cable_tray'?'net-tray':'net-panel')+(irot?' vert':'')+'" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(ih/d*100)+'">'
+      +'<span class="inm">'+esc(it.name)+'</span></div>';
+  });
   h+='</div><div class="net-legend"><span class="net-lg"><span class="net-sw sw-rack"></span>Rack</span><span class="net-lg"><span class="net-sw sw-tray"></span>Cable tray</span><span class="net-lg"><span class="net-sw sw-panel"></span>Wall panel</span><span class="net-lg"><span class="net-sw sw-door"></span>Door</span></div>'
     +'<p class="mut" style="margin-top:10px">Tap a rack to see its elevation. View-only \u2014 the layout is managed in Manage.</p></div>';
   h+='<div class="card"><h3>Racks in '+esc(room.name)+'</h3>';
@@ -2766,10 +2790,30 @@ function netRoomsHTML(p){
     h+='<button type="button" class="net-rrow" onclick="netOpenRack(\''+r.id+'\')"><span style="flex:1;min-width:0"><b>'+esc(r.name)+'</b><br><span class="mut">'+(r.height_u||42)+'U \u00b7 '+netUsedU(r.id)+'U used</span></span><span class="mut">Elevation \u203a</span></button>';
   });
   h+='</div>';
+  }
   var unplaced=netSiteSwitches(p.siteId).filter(function(sw){return !netPlacementOf(sw.id);});
   if(unplaced.length){
     h+='<div class="card"><h3>Not placed in a rack yet</h3>'
       +unplaced.map(function(sw){
+        var n=data.portEntries.filter(function(e){return e.switchId===sw.id;}).length;
+        return '<div class="kv"><span style="flex:1;min-width:0"><b>'+esc(sw.name)+'</b><br><span class="mut">'+n+' port'+(n===1?'':'s')+' logged</span></span>'
+          +'<button class="btn sec sml" style="flex:0 0 auto" onclick="netOpenPorts(\''+sw.id+'\')">Ports \u203a</button></div>';
+      }).join('')+'</div>';
+  }
+  h+=netSwitchSectionsHTML(p);
+  return h;
+}
+function netSwitchSectionsHTML(p){
+  var h='<div class="card"><h3>Add switch</h3>'
+    +'<label>Name</label><input id="ps_name" placeholder="e.g. MDF \u2014 SW1">'
+    +'<p class="mut">A switch added here belongs to '+esc(p.site||'the site')+', is shared by every job there, and starts unplaced until it is given a rack in Manage.</p>'
+    +'<button class="btn" onclick="addPortSwitch()">Add switch</button></div>';
+  var legacy=data.portSwitches.filter(function(s){return s.projectId===p.id&&!s.siteId;})
+    .sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});
+  if(legacy.length){
+    h+='<div class="card"><h3>Project switches</h3>'
+      +'<p class="mut">These belong to this job only.</p>'
+      +legacy.map(function(sw){
         var n=data.portEntries.filter(function(e){return e.switchId===sw.id;}).length;
         return '<div class="kv"><span style="flex:1;min-width:0"><b>'+esc(sw.name)+'</b><br><span class="mut">'+n+' port'+(n===1?'':'s')+' logged</span></span>'
           +'<button class="btn sec sml" style="flex:0 0 auto" onclick="netOpenPorts(\''+sw.id+'\')">Ports \u203a</button></div>';
@@ -2808,16 +2852,18 @@ function netElevHTML(p,room,rack){
 }
 function netPortsHTML(p,sw){
   var place=netPlacementOf(sw.id);
+  var isSite=!!(sw.siteId&&sw.siteId===p.siteId);
   var rows=data.portEntries.filter(function(e){return e.switchId===sw.id;})
     .sort(function(a,b){return (parseFloat(a.port)||0)-(parseFloat(b.port)||0);});
   var backLbl=netFromLog?'Port log':(place?place.rack.name+' \u00b7 '+place.room.name:'Network rooms');
   var h='<button class="btn sec sml" onclick="netBack()">\u2039 '+esc(backLbl)+'</button>'
     +modHero(p,sw.name,rows.length+' port'+(rows.length===1?'':'s')+' logged')
     +'<p class="mut" style="margin:0 2px 12px">'+esc(p.customer||'')+(p.site?' \u00b7 '+esc(p.site):'')
-    +(place?' \u00b7 '+esc(place.room.name)+' \u00b7 '+esc(place.rack.name)+' \u00b7 U'+place.device.u_start:' \u00b7 not placed in a rack yet')+'</p>'
-    +'<div class="net-banner">Site switch \u2014 this port map is shared by every job at '+esc(p.site||'this site')+'.</div>';
+    +(isSite?(place?' \u00b7 '+esc(place.room.name)+' \u00b7 '+esc(place.rack.name)+' \u00b7 U'+place.device.u_start:' \u00b7 not placed in a rack yet'):' \u00b7 Project switch \u2014 this job only')+'</p>'
+    +(isSite?'<div class="net-banner">Site switch \u2014 this port map is shared by every job at '+esc(p.site||'this site')+'.</div>':'');
   var chassisRes=renderSwitchChassis(sw,rows,p.id);
-  h+='<div class="card"><div class="proj-head"><div class="grow"><h3>'+esc(sw.name)+'</h3></div></div>';
+  h+='<div class="card"><div class="proj-head"><div class="grow"><h3>'+esc(sw.name)+'</h3></div>'
+    +(isSite?'':'<button class="del" onclick="delPortSwitch(\''+sw.id+'\')">Delete</button>')+'</div>';
   h+=chassisRes.html;
   if(chassisRes.mode!=='chassis'){
     if(!rows.length)h+='<p class="mut">No ports logged.</p>';
@@ -3563,6 +3609,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.15',items:['Ports live in Network now on jobs that belong to a site \u2014 the separate Ports tab is retired there, and switch ports open from the racks they sit in','The Network card shows on every site job, even before any rooms are designed, and a site switch can be added right there','A job\u2019s own switches are listed in Network too, with the same port screen and delete as before']},
  {v:'5.14',items:['Network: cable trays, wall panels and doors placed in Field Kit Manage now show on the room map too, with a small legend \u2014 still view-only here','Network rooms on the overview now note how many trays and panels each room has']},
  {v:'5.13',items:['New: Network \u2014 the network rooms and racks at a job\u2019s site, right on the project overview. View-only here; the layout itself is managed in Field Kit Manage','Port log: the site\u2019s switches now come first, with their room and rack \u2014 their port map is shared by every job at the site, and ports stay editable here','A switch added on a job at a site now belongs to the site and starts unplaced, ready to be given a rack in Manage. Switches that belong to a single job are unchanged']},
  {v:'5.12',items:['Cable is a regular material now: the Cable tab is retired, and pulls already logged stay on their job as a read-only history list','Materials: Quick picks from the company catalog \u2014 search the catalog, set or type a quantity, tap to log','ConnectWise Notes: the CABLE section appears only on jobs that have cable pulls','New Materials icon \u2014 the parts tote']},
