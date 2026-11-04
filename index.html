@@ -751,6 +751,31 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
 .chassis-ports-matrix{
   display:flex;align-items:center;gap:12px;width:max-content;margin:0 auto;
 }
+
+/* --- Network rooms (v5.13, view-only) --- */
+.net-map{position:relative;border:1px solid var(--line);border-radius:12px;background-color:var(--panel2);overflow:hidden;}
+.net-rack{position:absolute;min-width:48px;min-height:38px;border:1px solid rgba(99,102,241,0.45);border-radius:8px;background:linear-gradient(180deg, rgba(99,102,241,0.20), rgba(99,102,241,0.08));color:var(--text);font:inherit;text-align:left;padding:6px 8px;cursor:pointer;overflow:hidden;}
+.net-rack .rnm{font-weight:700;font-size:.82rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.net-rack .rsub{color:var(--muted);font-size:.7rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.net-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;margin-bottom:10px;}
+.net-chip{flex:0 0 auto;background:var(--chip);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:7px 13px;font:inherit;font-size:.85rem;cursor:pointer;}
+.net-chip.on{background:rgba(99,102,241,0.25);border-color:rgba(99,102,241,0.45);color:#c7d2fe;font-weight:700;}
+.net-rackcol{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:8px;display:flex;flex-direction:column;gap:3px;}
+.net-block{display:flex;align-items:stretch;gap:8px;}
+.net-ulab{flex:0 0 52px;font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--muted-dark);display:flex;align-items:center;}
+.net-dev{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:0 10px;display:flex;align-items:center;gap:8px;overflow:hidden;}
+.net-dev .dn{font-weight:700;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.net-dev .dt{color:var(--muted);font-size:.78rem;white-space:nowrap;}
+.net-dev.t-switch{border-color:rgba(99,102,241,0.55);background:linear-gradient(180deg, rgba(99,102,241,0.22), rgba(99,102,241,0.10));}
+.net-dev.t-ups{border-color:rgba(16,185,129,0.45);}
+.net-dev.t-pdu{border-color:rgba(245,158,11,0.5);}
+.net-dev.t-blank,.net-dev.t-cable_manager{border-style:dashed;color:var(--muted);background:transparent;}
+.net-ticks{margin-left:auto;flex:none;width:34%;max-width:190px;height:12px;border-radius:3px;background-image:repeating-linear-gradient(90deg, rgba(165,180,252,0.55) 0 5px, transparent 5px 10px);}
+.net-portsbtn{margin-left:auto;flex:none;background:rgba(99,102,241,0.28);border:1px solid rgba(99,102,241,0.5);color:#e0e7ff;border-radius:999px;padding:5px 12px;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer;}
+.net-empty{flex:1;border:1px dashed rgba(255,255,255,0.09);border-radius:8px;background-image:repeating-linear-gradient(45deg, rgba(255,255,255,0.018) 0 10px, transparent 10px 20px);display:flex;align-items:center;padding:0 10px;color:var(--muted-dark);font-size:.78rem;}
+.net-banner{border:1px solid rgba(99,102,241,0.45);background:rgba(99,102,241,0.13);border-radius:12px;padding:11px 13px;font-size:.9rem;margin-bottom:12px;}
+.net-rrow{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;border-bottom:1px solid var(--line);color:var(--text);font:inherit;text-align:left;padding:10px 2px;cursor:pointer;}
+
 .port-bank{
   display:grid;grid-template-rows:repeat(2,1fr);grid-auto-flow:column;
   gap:6px 8px;background:rgba(0,0,0,0.45);padding:10px 12px;border-radius:8px;
@@ -924,7 +949,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.12';
+var APP_VERSION='5.13';
 var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
 var ALWAYS_ON=['finallog'];
@@ -2262,7 +2287,7 @@ function renderProject(){
   if(!p){goProjects();return;}
   loadMembers(p.id);
   var mods=enabledMods(p);
-  if(curTab!=='overview'&&mods.indexOf(curTab)<0)curTab='overview';
+  if(curTab!=='overview'&&mods.indexOf(curTab)<0&&!(curTab==='network'&&netHasContent(p)))curTab='overview';
   var pc=projColor(p);
   var doneP=(p.status||'active')==='done';
   var h='<button class="btn sec sml" onclick="goProjects()">&#8592; All projects</button>'
@@ -2275,6 +2300,7 @@ function renderProject(){
   $('app').innerHTML=h;
   var body=$('tabBody');
   if(curTab==='overview')body.innerHTML=overviewHTML(p);
+  else if(curTab==='network')body.innerHTML=networkHTML(p);
   else if(curTab==='time')body.innerHTML=timeHTML(p);
   else if(curTab==='storage'){body.innerHTML=storageHTML(p);storageRecalc(p);}
   else if(curTab==='poe')body.innerHTML=poeHTML(p);
@@ -2325,6 +2351,7 @@ function overviewHTML(p){
         +'<div style="font-weight:700;margin-top:9px">'+esc(lbl?lbl[1]:id)+'</div>'
         +(met?'<div class="mut" style="font-size:.8rem;margin-top:2px">'+esc(met)+'</div>':'')
         +'</button>';}).join('')+'</div>';
+  h+=networkCardHTML(p);
   h+=cableHistoryHTML(p);
   var ev=[];
   data.timeEntries.forEach(function(e){ if(e.projectId!==p.id)return; var t=new Date(e.startISO).getTime(); ev.push({t:isFinite(t)?t:0,type:'time',e:e}); });
@@ -2572,6 +2599,187 @@ function cableHistoryHTML(p){
     +'<div class="kv" style="margin-top:8px"><span class="mut">Project total</span><b>'+projectCableFt(p.id)+' ft</b></div></div>';
   return h;
 }
+/* ============ NETWORK (v5.13) ============ */
+/* The site's network rooms, racks and rack devices — the records
+   Manage's Network Room Designer owns — shown READ-ONLY here: the
+   room map and the rack elevations render exactly as designed, with
+   no add, move or edit controls. The one interactive element is a
+   switch: tapping it opens the shared port screen for that SITE
+   switch (the same port_entries the port log has always kept), and
+   ports stay fully editable. Loaded at sign-in alongside the
+   catalog; if the tables are not there, everything below simply
+   stays empty and the rest of the app is untouched. */
+var netRooms=[], netRacks=[], netDevices=[];
+var netRoomId=null, netRackId=null, netSwId=null, netFromLog=false;
+var NET_TYPES=[['switch','Switch'],['patch_panel','Patch panel'],['ups','UPS'],['nvr_server','NVR / Server'],['router_firewall','Router / Firewall'],['pdu','PDU'],['cable_manager','Cable manager'],['blank','Blank'],['other','Other']];
+var NET_ROW=26;
+function netTypeLabel(t){for(var i=0;i<NET_TYPES.length;i++)if(NET_TYPES[i][0]===t)return NET_TYPES[i][1];return 'Other';}
+function loadNetwork(){
+  if(!sb||!sbUser) return Promise.resolve();
+  return Promise.all([
+    sb.from('network_rooms').select('*'),
+    sb.from('racks').select('*'),
+    sb.from('rack_devices').select('*')
+  ]).then(function(rs){
+    if(rs[0]&&!rs[0].error) netRooms=rs[0].data||[];
+    if(rs[1]&&!rs[1].error) netRacks=rs[1].data||[];
+    if(rs[2]&&!rs[2].error) netDevices=rs[2].data||[];
+  }).catch(function(){});
+}
+function netSortName(a,b){return ((a.sort||0)-(b.sort||0))||String(a.name||'').localeCompare(String(b.name||''));}
+function netRoomById(id){if(!id)return null;for(var i=0;i<netRooms.length;i++)if(netRooms[i].id===id)return netRooms[i];return null;}
+function netRackById(id){if(!id)return null;for(var i=0;i<netRacks.length;i++)if(netRacks[i].id===id)return netRacks[i];return null;}
+function netRoomsOf(siteId){if(!siteId)return [];return netRooms.filter(function(r){return r.site_id===siteId&&!r.deleted_at;}).sort(netSortName);}
+function netRacksOf(roomId){return netRacks.filter(function(r){return r.room_id===roomId&&!r.deleted_at;}).sort(netSortName);}
+function netDevsOf(rackId){return netDevices.filter(function(d){return d.rack_id===rackId&&!d.deleted_at;});}
+function netUsedU(rackId){return netDevsOf(rackId).reduce(function(n,d){return n+(d.u_size||1);},0);}
+function netSiteSwitches(siteId){if(!siteId)return [];return data.portSwitches.filter(function(s){return s.siteId===siteId;}).sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});}
+function netPlacementOf(swId){
+  var devs=netDevices.filter(function(d){return d.switch_id===swId&&!d.deleted_at;});
+  for(var i=0;i<devs.length;i++){
+    var rack=netRackById(devs[i].rack_id), room=rack?netRoomById(rack.room_id):null;
+    if(rack&&room&&!rack.deleted_at&&!room.deleted_at) return {device:devs[i],rack:rack,room:room};
+  }
+  return null;
+}
+function netHasContent(p){
+  if(netRoomsOf(p.siteId).length)return true;
+  if(netSwId){for(var i=0;i<data.portSwitches.length;i++)if(data.portSwitches[i].id===netSwId&&data.portSwitches[i].siteId&&data.portSwitches[i].siteId===p.siteId)return true;}
+  return false;
+}
+function networkCardHTML(p){
+  var rooms=netRoomsOf(p.siteId);
+  if(!rooms.length)return '';
+  var nRacks=0;
+  rooms.forEach(function(r){nRacks+=netRacksOf(r.id).length;});
+  var h='<div class="card"><div class="cardhd"><h3>Network</h3></div>'
+    +'<p class="mut">Network rooms at '+esc(p.site||'this site')+' \u2014 the layout is managed in Manage; here it is view-only, and switch ports stay editable.</p>'
+    +rooms.map(function(r){
+      var rk=netRacksOf(r.id);
+      return '<div class="kv"><span><b>'+esc(r.name)+'</b><br><span class="mut">'+rk.length+' rack'+(rk.length===1?'':'s')+'</span></span>'
+        +'<button class="btn sec sml" onclick="netOpenRoom(\''+r.id+'\')">View \u203a</button></div>';
+    }).join('')
+    +'<div class="kv" style="margin-top:8px"><span class="mut">Site switches</span><b>'+netSiteSwitches(p.siteId).length+'</b></div></div>';
+  return h;
+}
+function netOpenRoom(roomId){netRoomId=roomId;netRackId=null;netSwId=null;netFromLog=false;curTab='network';render();window.scrollTo(0,0);}
+function netPickRoom(roomId){netRoomId=roomId;netRackId=null;render();window.scrollTo(0,0);}
+function netOpenRack(rackId){var r=netRackById(rackId);if(!r)return;netRackId=rackId;netRoomId=r.room_id;netSwId=null;render();window.scrollTo(0,0);}
+function netOpenPorts(swId,fromLog){netSwId=swId;netFromLog=!!fromLog;if(fromLog)curTab='network';render();window.scrollTo(0,0);}
+function netBack(){
+  if(netSwId){netSwId=null;if(netFromLog){netFromLog=false;curTab='ports';}render();window.scrollTo(0,0);return;}
+  if(netRackId){netRackId=null;render();window.scrollTo(0,0);return;}
+  curTab='overview';render();window.scrollTo(0,0);
+}
+function networkHTML(p){
+  if(netSwId){
+    var sw=null;
+    for(var i=0;i<data.portSwitches.length;i++)if(data.portSwitches[i].id===netSwId)sw=data.portSwitches[i];
+    if(sw&&sw.siteId&&sw.siteId===p.siteId)return netPortsHTML(p,sw);
+    netSwId=null;
+  }
+  if(netRackId){
+    var rack=netRackById(netRackId), room=rack?netRoomById(rack.room_id):null;
+    if(rack&&room&&!rack.deleted_at&&!room.deleted_at&&room.site_id===p.siteId)return netElevHTML(p,room,rack);
+    netRackId=null;
+  }
+  return netRoomsHTML(p);
+}
+function netRoomsHTML(p){
+  var rooms=netRoomsOf(p.siteId);
+  if(!rooms.some(function(r){return r.id===netRoomId;}))netRoomId=rooms.length?rooms[0].id:null;
+  var room=netRoomId?netRoomById(netRoomId):null;
+  var h='<button class="btn sec sml" onclick="netBack()">\u2039 Overview</button>'
+    +modHero(p,'Network',rooms.length+' room'+(rooms.length===1?'':'s'));
+  if(!room){h+='<div class="card"><p class="mut">No network rooms at this site yet. Rooms and racks are set up in Manage.</p></div>';return h;}
+  h+='<div class="net-chips">'+rooms.map(function(r){return '<button type="button" class="net-chip'+(r.id===room.id?' on':'')+'" onclick="netPickRoom(\''+r.id+'\')">'+esc(r.name)+'</button>';}).join('')+'</div>';
+  var racks=netRacksOf(room.id);
+  var w=Number(room.width_ft)||14, d=Number(room.depth_ft)||10;
+  h+='<div class="card"><h3>'+esc(room.name)+' \u2014 top-down</h3>'
+    +'<div class="kv" style="margin:6px 0 10px"><span class="mut">'+w+' ft \u2014 '+Math.round(w*12)+' in</span><span class="mut">'+d+' ft deep</span></div>'
+    +'<div class="net-map" style="aspect-ratio:'+w+'/'+d+';background-size:'+(50/w)+'% '+(50/d)+'%;background-image:linear-gradient(rgba(255,255,255,0.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.045) 1px,transparent 1px)">';
+  racks.forEach(function(r){
+    var rot=((r.map_rot||0)%180)!==0;
+    var fw=rot?Number(r.fp_d):Number(r.fp_w), fd=rot?Number(r.fp_w):Number(r.fp_d);
+    h+='<button type="button" class="net-rack" onclick="netOpenRack(\''+r.id+'\')" style="left:'+(Number(r.map_x)/w*100)+'%;top:'+(Number(r.map_y)/d*100)+'%;width:'+(fw/w*100)+'%;height:'+(fd/d*100)+'%">'
+      +'<span class="rnm">'+esc(r.name)+'</span><span class="rsub">'+(r.height_u||42)+'U \u00b7 '+netDevsOf(r.id).length+' devices</span></button>';
+  });
+  h+='</div><p class="mut" style="margin-top:10px">Tap a rack to see its elevation. View-only \u2014 the layout is managed in Manage.</p></div>';
+  h+='<div class="card"><h3>Racks in '+esc(room.name)+'</h3>';
+  if(!racks.length)h+='<p class="mut">No racks in this room yet.</p>';
+  racks.forEach(function(r){
+    h+='<button type="button" class="net-rrow" onclick="netOpenRack(\''+r.id+'\')"><span style="flex:1;min-width:0"><b>'+esc(r.name)+'</b><br><span class="mut">'+(r.height_u||42)+'U \u00b7 '+netUsedU(r.id)+'U used</span></span><span class="mut">Elevation \u203a</span></button>';
+  });
+  h+='</div>';
+  var unplaced=netSiteSwitches(p.siteId).filter(function(sw){return !netPlacementOf(sw.id);});
+  if(unplaced.length){
+    h+='<div class="card"><h3>Not placed in a rack yet</h3>'
+      +unplaced.map(function(sw){
+        var n=data.portEntries.filter(function(e){return e.switchId===sw.id;}).length;
+        return '<div class="kv"><span style="flex:1;min-width:0"><b>'+esc(sw.name)+'</b><br><span class="mut">'+n+' port'+(n===1?'':'s')+' logged</span></span>'
+          +'<button class="btn sec sml" style="flex:0 0 auto" onclick="netOpenPorts(\''+sw.id+'\')">Ports \u203a</button></div>';
+      }).join('')+'</div>';
+  }
+  return h;
+}
+function netElevHTML(p,room,rack){
+  var devs=netDevsOf(rack.id), used=netUsedU(rack.id), height=rack.height_u||42;
+  var h='<button class="btn sec sml" onclick="netBack()">\u2039 '+esc(room.name)+'</button>'
+    +modHero(p,rack.name+' \u2014 '+height+'U',used+'U used')
+    +'<p class="mut" style="margin:0 2px 12px">'+esc(p.customer||'')+(p.site?' \u00b7 '+esc(p.site):'')+' \u00b7 '+esc(room.name)+' \u00b7 '+used+'U used \u00b7 '+(height-used)+'U free</p>';
+  var byTop={},covered={};
+  devs.forEach(function(dv){byTop[dv.u_start+(dv.u_size||1)-1]=dv;for(var u=dv.u_start;u<dv.u_start+(dv.u_size||1);u++)covered[u]=dv;});
+  var col='',u=height;
+  while(u>=1){
+    if(byTop[u]){
+      var dv=byTop[u],sz=dv.u_size||1;
+      var lab=sz>1?'U'+dv.u_start+'\u2013'+(dv.u_start+sz-1):'U'+dv.u_start;
+      col+='<div class="net-block" style="height:'+(sz*NET_ROW)+'px"><span class="net-ulab">'+lab+'</span>'
+        +'<div class="net-dev t-'+esc(dv.type)+'"><span class="dn">'+esc(dv.name)+'</span><span class="dt">\u00b7 '+esc(netTypeLabel(dv.type))+'</span>'
+        +(dv.type==='patch_panel'?'<span class="net-ticks"></span>':'')
+        +(dv.type==='switch'&&dv.switch_id?'<button type="button" class="net-portsbtn" onclick="netOpenPorts(\''+dv.switch_id+'\')">Ports \u203a</button>':'')
+        +'</div></div>';
+      u-=sz;
+    }else{
+      var top=u;while(u>=1&&!covered[u])u--;
+      var bot=u+1,n=top-bot+1;
+      col+='<div class="net-block" style="height:'+(n*NET_ROW)+'px"><span class="net-ulab">'+(n>1?'U'+bot+'\u2013'+top:'U'+top)+'</span>'
+        +'<div class="net-empty">Empty \u2014 '+n+'U free</div></div>';
+    }
+  }
+  h+='<div class="net-rackcol">'+col+'</div>'
+    +'<p class="mut" style="margin-top:12px">Tap a switch to open its port screen. View-only \u2014 changes to the layout are made in Manage.</p>';
+  return h;
+}
+function netPortsHTML(p,sw){
+  var place=netPlacementOf(sw.id);
+  var rows=data.portEntries.filter(function(e){return e.switchId===sw.id;})
+    .sort(function(a,b){return (parseFloat(a.port)||0)-(parseFloat(b.port)||0);});
+  var backLbl=netFromLog?'Port log':(place?place.rack.name+' \u00b7 '+place.room.name:'Network rooms');
+  var h='<button class="btn sec sml" onclick="netBack()">\u2039 '+esc(backLbl)+'</button>'
+    +modHero(p,sw.name,rows.length+' port'+(rows.length===1?'':'s')+' logged')
+    +'<p class="mut" style="margin:0 2px 12px">'+esc(p.customer||'')+(p.site?' \u00b7 '+esc(p.site):'')
+    +(place?' \u00b7 '+esc(place.room.name)+' \u00b7 '+esc(place.rack.name)+' \u00b7 U'+place.device.u_start:' \u00b7 not placed in a rack yet')+'</p>'
+    +'<div class="net-banner">Site switch \u2014 this port map is shared by every job at '+esc(p.site||'this site')+'.</div>';
+  var chassisRes=renderSwitchChassis(sw,rows,p.id);
+  h+='<div class="card"><div class="proj-head"><div class="grow"><h3>'+esc(sw.name)+'</h3></div></div>';
+  h+=chassisRes.html;
+  if(chassisRes.mode!=='chassis'){
+    if(!rows.length)h+='<p class="mut">No ports logged.</p>';
+    else h+='<table><tr><th>Port</th><th>Device</th><th>Jack</th><th>Notes</th><th></th></tr>'
+      +rows.map(function(r){return '<tr><td><b>'+esc(r.port)+'</b></td><td>'+esc(r.device)+'</td><td>'+esc(r.jack||'')+'</td><td>'+esc(r.notes||'')+'</td>'
+        +'<td style="white-space:nowrap"><button class="edt" onclick="editPortRow(\''+r.id+'\',\''+sw.id+'\')">Edit</button>'
+        +'<button class="del" onclick="delPortRow(\''+r.id+'\')">Del</button></td></tr>';}).join('')+'</table>';
+  }
+  h+='<h4 id="port_form_title_'+sw.id+'">'+(portEditId&&portEditSw===sw.id?'Edit port':'Add port')+'</h4>'
+    +'<div class="row"><div><label>Port</label><input id="pe_port_'+sw.id+'" placeholder="1"></div>'
+    +'<div><label>Device</label><input id="pe_dev_'+sw.id+'" placeholder="Cam \u2014 gym entrance"></div>'
+    +'<div><label>Jack</label><input id="pe_jack_'+sw.id+'" placeholder="PP-A12"></div></div>'
+    +'<label>Notes</label><input id="pe_notes_'+sw.id+'">'
+    +'<button class="btn sec" onclick="savePortRow(\''+sw.id+'\')">'
+    +(portEditId&&portEditSw===sw.id?'Save changes':'Add port')+'</button></div>';
+  return h;
+}
 /* ============ STORAGE TAB ============ */
 var ST_PRESETS=[['1080p',4],['4MP',8],['5MP',10],['4K',16]];
 function storageHTML(p){
@@ -2759,11 +2967,26 @@ function delIpRow(id){if(!confirm('Delete this IP assignment?'))return;
 /* ============ PORTS TAB ============ */
 var portEditId=null;
 function portsHTML(p){
-  var sws=data.portSwitches.filter(function(s){return s.projectId===p.id;});
+  var sws=data.portSwitches.filter(function(s){return s.projectId===p.id&&!s.siteId;});
+  var siteSws=netSiteSwitches(p.siteId);
   var h=modHero(p,'Port log',data.portEntries.filter(function(e){return e.projectId===p.id;}).length+' entries')+'<div class="card"><h3>Add switch / closet</h3>'
     +'<label>Name</label><input id="ps_name" placeholder="e.g. MDF — SW1">'
+    +(p.siteId?'<p class="mut">This job is at '+esc(p.site||'its site')+' \u2014 a switch added here belongs to the site, is shared by every job there, and starts unplaced until it is given a rack in Manage.</p>':'')
     +'<button class="btn" onclick="addPortSwitch()">Add switch</button></div>';
-  if(!sws.length)h+='<div class="card"><p class="mut">No switches yet.</p></div>';
+  if(siteSws.length){
+    h+='<div class="card"><h3>Site switches</h3>'
+      +'<p class="mut">Shared by every job at '+esc(p.site||'this site')+'. Tap one to open its port map \u2014 ports stay editable here; the rack layout is managed in Manage.</p>'
+      +siteSws.map(function(sw){
+        var pl=netPlacementOf(sw.id);
+        var n=data.portEntries.filter(function(e){return e.switchId===sw.id;}).length;
+        return '<div class="kv"><span style="flex:1;min-width:0"><b>'+esc(sw.name)+'</b><br><span class="mut">'
+          +(pl?esc(pl.room.name)+' \u00b7 '+esc(pl.rack.name)+' \u00b7 U'+pl.device.u_start:'Not placed in a rack yet')
+          +' \u00b7 '+n+' port'+(n===1?'':'s')+' logged</span></span>'
+          +'<button class="btn sec sml" style="flex:0 0 auto" onclick="netOpenPorts(\''+sw.id+'\',true)">Ports \u203a</button></div>';
+      }).join('')+'</div>';
+  }
+  if(!sws.length&&!siteSws.length)h+='<div class="card"><p class="mut">No switches yet.</p></div>';
+  if(sws.length&&siteSws.length)h+='<p class="mut" style="margin:14px 2px 8px"><b>Project switches</b> \u2014 these belong to this job only.</p>';
   sws.forEach(function(sw){
     var rows=data.portEntries.filter(function(e){return e.switchId===sw.id;})
       .sort(function(a,b){return (parseFloat(a.port)||0)-(parseFloat(b.port)||0);});
@@ -2795,7 +3018,7 @@ function portsHTML(p){
 var portEditSw=null;
 function portLabelText(p){
   var lines=[];
-  data.portSwitches.filter(function(s){return s.projectId===p.id;}).forEach(function(sw){
+  data.portSwitches.filter(function(s){return s.projectId===p.id||(p.siteId&&s.siteId===p.siteId);}).forEach(function(sw){
     data.portEntries.filter(function(e){return e.switchId===sw.id;})
       .sort(function(a,b){return (parseFloat(a.port)||0)-(parseFloat(b.port)||0);})
       .forEach(function(r){lines.push(sw.name+' Port '+r.port+' — '+r.device+(r.jack?' — '+r.jack:''));});
@@ -2803,7 +3026,9 @@ function portLabelText(p){
   return lines.join('\n')||'No ports logged yet.';
 }
 function addPortSwitch(){var name=val('ps_name');if(!name){toast('Switch name required');return;}
-  data.portSwitches.push({id:uid(),projectId:view.id,name:name});save();render();}
+  var p=projById(view.id);
+  if(p&&p.siteId){data.portSwitches.push({id:uid(),projectId:'',siteId:p.siteId,name:name});save();render();toast('Switch added at '+(p.site||'the site')+' \u2014 not placed in a rack yet');return;}
+  data.portSwitches.push({id:uid(),projectId:view.id,siteId:null,name:name});save();render();}
 function delPortSwitch(id){if(!confirm('Delete this switch and its port entries?'))return;
   data.portSwitches=data.portSwitches.filter(function(s){return s.id!==id;});
   data.portEntries=data.portEntries.filter(function(e){return e.switchId!==id;});save();render();}
@@ -3283,6 +3508,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.13',items:['New: Network \u2014 the network rooms and racks at a job\u2019s site, right on the project overview. View-only here; the layout itself is managed in Field Kit Manage','Port log: the site\u2019s switches now come first, with their room and rack \u2014 their port map is shared by every job at the site, and ports stay editable here','A switch added on a job at a site now belongs to the site and starts unplaced, ready to be given a rack in Manage. Switches that belong to a single job are unchanged']},
  {v:'5.12',items:['Cable is a regular material now: the Cable tab is retired, and pulls already logged stay on their job as a read-only history list','Materials: Quick picks from the company catalog \u2014 search the catalog, set or type a quantity, tap to log','ConnectWise Notes: the CABLE section appears only on jobs that have cable pulls','New Materials icon \u2014 the parts tote']},
  {v:'5.11',items:['Design polish: status badges, form labels and shadows now match the Field Kit Manage family look','One button style retired \u2014 a single red for destructive actions']},
  {v:'5.10',items:['The Admin area has been removed — users, cable options, the recycle bin and project repairs now live in Field Kit Manage','The Live Tech Radar retired along with it','New on phones: Install app in the three-dot menu — add Field Kit to your home screen from inside the app','Cable type and color lists now load at sign-in, so edits made in Manage reach the app on their own']},
@@ -3529,7 +3755,7 @@ function initialLoad(){
   $('app').innerHTML=loadingHTML();
   setSyncStatus('refreshing');
   migrateLocalOnce().then(function(){ return fetchAllFromServer(); }).then(function(){
-    var jobs=[loadPrefs(),loadOwnTimer(),loadCatalog()];
+    var jobs=[loadPrefs(),loadOwnTimer(),loadCatalog(),loadNetwork()];
     return Promise.all(jobs);
   }).then(function(){
     setSyncStatus('ok');
@@ -3704,7 +3930,7 @@ function toDB(table,r,isNew){
       o.switch_id=r.switchId||null; o.name=r.name||'';
       o.watts=numOrNull(r.watts); o.qty=numOrNull(r.qty); break;
     case 'port_switches':
-      o.project_id=r.projectId||null; o.name=r.name||''; break;
+      o.project_id=r.projectId||null; o.site_id=r.siteId||null; o.name=r.name||''; break;
     case 'port_entries':
       o.switch_id=r.switchId||null; o.port=r.port||null; o.device=r.device||null;
       o.jack=r.jack||null; o.notes=r.notes||null; break;
@@ -3723,6 +3949,7 @@ function fromDB(table,r){
       o.ticket=r.ticket||''; o.notes=r.notes||''; o.status=r.status||'active';
       o.enabledModules=r.enabled_modules||[]; o.owner_id=r.owner_id||null;
       o.schedStart=r.sched_start||''; o.schedEnd=r.sched_end||'';
+      o.siteId=r.site_id||null; o.customerId=r.customer_id||null;
       o.deleted_at=r.deleted_at||null; o.updatedBy=r.updated_by||null;
       o.createdAt=tsOf(r.created_at); o.technicians=[]; break;
     case 'time_entries':
@@ -3750,7 +3977,7 @@ function fromDB(table,r){
       o.watts=r.watts==null?0:Number(r.watts); o.qty=r.qty==null?0:Number(r.qty);
       o.createdAt=tsOf(r.created_at); break;
     case 'port_switches':
-      o.projectId=r.project_id||''; o.name=r.name||''; o.createdAt=tsOf(r.created_at); break;
+      o.projectId=r.project_id||''; o.siteId=r.site_id||null; o.name=r.name||''; o.createdAt=tsOf(r.created_at); break;
     case 'port_entries':
       o.switchId=r.switch_id||''; o.port=r.port||''; o.device=r.device||'';
       o.jack=r.jack||''; o.notes=r.notes||''; o.createdAt=tsOf(r.created_at); break;
