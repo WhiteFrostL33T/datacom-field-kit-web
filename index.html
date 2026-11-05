@@ -971,7 +971,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.16';
+var APP_VERSION='5.17';
 var DEMO=/[?&]demo\b/.test(location.search); // v5.16: sign-in-free demo mode (?demo) — see the demo block before the auth section
 var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
@@ -1492,6 +1492,8 @@ function toggleSwitchMode(swId, mode){
 }
 
 function setSwitchPortDensity(swId, count){
+  var sw=null; for(var i=0;i<data.portSwitches.length;i++) if(data.portSwitches[i].id===swId) sw=data.portSwitches[i];
+  if(sw&&sw.siteId&&netPlacementOf(swId)) return; // v5.17: a placed site switch is managed in Manage — its port count is locked here
   switchPortDensities[swId] = count;
   render();
 }
@@ -1517,7 +1519,7 @@ function quickFillPort(swId, portNum){
   }
 }
 
-function renderSwitchChassis(sw, rows, projectId){
+function renderSwitchChassis(sw, rows, projectId, locked){
   var swId = sw.id;
   var mode = switchFaceplateModes[swId] || 'split';
   
@@ -1560,8 +1562,13 @@ function renderSwitchChassis(sw, rows, projectId){
   h += '      <b>'+patchedCount+'</b>/'+density+' Patched ('+patchPct+'%)';
   h += '    </div>';
   h += '    <div class="chassis-view-btns">';
-  h += '      <button type="button" class="chassis-view-btn '+(density===24?'act':'')+'" onclick="setSwitchPortDensity(\''+swId+'\', 24)">24P</button>';
-  h += '      <button type="button" class="chassis-view-btn '+(density===48?'act':'')+'" onclick="setSwitchPortDensity(\''+swId+'\', 48)">48P</button>';
+  if(locked){ // v5.17: placed site switch — port count is a switch detail, shown as plain text
+    h += '      <span class="chassis-view-btn '+(density===24?'act':'')+'" style="cursor:default">24P</span>';
+    h += '      <span class="chassis-view-btn '+(density===48?'act':'')+'" style="cursor:default">48P</span>';
+  } else {
+    h += '      <button type="button" class="chassis-view-btn '+(density===24?'act':'')+'" onclick="setSwitchPortDensity(\''+swId+'\', 24)">24P</button>';
+    h += '      <button type="button" class="chassis-view-btn '+(density===48?'act':'')+'" onclick="setSwitchPortDensity(\''+swId+'\', 48)">48P</button>';
+  }
   h += '    </div>';
   h += '    <div class="chassis-view-btns">';
   h += '      <button type="button" class="chassis-view-btn '+(mode==='split'?'act':'')+'" onclick="toggleSwitchMode(\''+swId+'\', \'split\')">Split</button>';
@@ -2866,9 +2873,11 @@ function netPortsHTML(p,sw){
     +'<p class="mut" style="margin:0 2px 12px">'+esc(p.customer||'')+(p.site?' \u00b7 '+esc(p.site):'')
     +(isSite?(place?' \u00b7 '+esc(place.room.name)+' \u00b7 '+esc(place.rack.name)+' \u00b7 U'+place.device.u_start:' \u00b7 not placed in a rack yet'):' \u00b7 Project switch \u2014 this job only')+'</p>'
     +(isSite?'<div class="net-banner">Site switch \u2014 this port map is shared by every job at '+esc(p.site||'this site')+'.</div>':'');
-  var chassisRes=renderSwitchChassis(sw,rows,p.id);
+  var swLocked=isSite&&!!place; // v5.17: placed site switches are modified in Manage's elevation only
+  var chassisRes=renderSwitchChassis(sw,rows,p.id,swLocked);
   h+='<div class="card"><div class="proj-head"><div class="grow"><h3>'+esc(sw.name)+'</h3></div>'
-    +(isSite?'':'<button class="del" onclick="delPortSwitch(\''+sw.id+'\')">Delete</button>')+'</div>';
+    +(isSite?'':'<button class="del" onclick="delPortSwitch(\''+sw.id+'\')">Delete</button>')+'</div>'
+    +(swLocked?'<p class="mut" style="margin:0 0 10px">Switch details are managed in Field Kit Manage \u2014 ports stay editable here.</p>':'');
   h+=chassisRes.html;
   if(chassisRes.mode!=='chassis'){
     if(!rows.length)h+='<p class="mut">No ports logged.</p>';
@@ -3614,6 +3623,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.17',items:['A switch that has been placed in a rack at a site is managed from Field Kit Manage \u2014 on its port screen here its details are locked, and its port count can no longer be changed. Its ports stay fully editable here','Switches that are not placed in a rack yet, and switches that belong to a single job, work exactly as before']},
  {v:'5.16',items:['New: a sign-in-free demo \u2014 tap \u201cView the demo\u201d on the sign-in screen (or add ?demo to the address) to explore Field Kit with sample data. Nothing in the demo is saved or synced']},
  {v:'5.15',items:['Ports live in Network now on jobs that belong to a site \u2014 the separate Ports tab is retired there, and switch ports open from the racks they sit in','The Network card shows on every site job, even before any rooms are designed, and a site switch can be added right there','A job\u2019s own switches are listed in Network too, with the same port screen and delete as before']},
  {v:'5.14',items:['Network: cable trays, wall panels and doors placed in Field Kit Manage now show on the room map too, with a small legend \u2014 still view-only here','Network rooms on the overview now note how many trays and panels each room has']},

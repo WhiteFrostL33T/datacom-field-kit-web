@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v5.16
+**Current version:** v5.17
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v5.17** — Placed site switches are managed from Field Kit Manage — on their port screen here the switch details are locked and ports stay fully editable; unplaced and job-owned switches are unchanged
 
 - **v5.16** — Demo mode: sign-in-free sample data at ?demo
 
