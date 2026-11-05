@@ -755,46 +755,115 @@ button.stat{cursor:pointer;text-align:left;font:inherit;color:inherit;}
 }
 
 /* --- Network rooms (v5.13, view-only) --- */
-.net-map{position:relative;border:1px solid var(--line);border-radius:12px;background-color:var(--panel2);overflow:hidden;}
-.net-rack{position:absolute;min-width:48px;min-height:38px;border:1px solid rgba(99,102,241,0.45);border-radius:8px;background:linear-gradient(180deg, rgba(99,102,241,0.20), rgba(99,102,241,0.08));color:var(--text);font:inherit;text-align:left;padding:6px 8px;cursor:pointer;overflow:hidden;}
-.net-rack .rnm{font-weight:700;font-size:.82rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.net-rack .rsub{color:var(--muted);font-size:.7rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.net-item{position:absolute;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:2px 6px;pointer-events:none;}
-.net-item .inm{font-size:.68rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;}
-.net-item.vert .inm{writing-mode:vertical-rl;}
-.net-tray{border:1px solid rgba(245,158,11,0.55);background-color:rgba(245,158,11,0.12);background-image:linear-gradient(0deg,transparent calc(50% - 1px),rgba(245,158,11,0.7) calc(50% - 1px),rgba(245,158,11,0.7) calc(50% + 1px),transparent calc(50% + 1px)),repeating-linear-gradient(45deg,rgba(245,158,11,0.18) 0 6px,transparent 6px 12px);color:#fcd34d;}
-.net-tray.vert{background-image:linear-gradient(90deg,transparent calc(50% - 1px),rgba(245,158,11,0.7) calc(50% - 1px),rgba(245,158,11,0.7) calc(50% + 1px),transparent calc(50% + 1px)),repeating-linear-gradient(45deg,rgba(245,158,11,0.18) 0 6px,transparent 6px 12px);}
-.net-panel{border:1px solid rgba(148,163,184,0.55);background:linear-gradient(180deg,rgba(148,163,184,0.30),rgba(148,163,184,0.13));color:#cbd5e1;}
-.net-door{overflow:visible;}
-.net-door .dgap{fill:var(--panel2);}
-.net-door .dwedge{fill:rgba(226,232,240,0.05);}
-.net-door .darc{fill:none;stroke:rgba(226,232,240,0.55);stroke-width:1.6;stroke-dasharray:5 4;}
-.net-door .dlf{stroke:#e2e8f0;stroke-width:2.6;}
-.net-door .dhinge{fill:#e2e8f0;}
-.net-door .dlab{position:absolute;left:50%;bottom:1px;transform:translateX(-50%);color:var(--muted);font-size:.62rem;font-weight:600;}
-.net-sw.sw-door{border:1px solid rgba(226,232,240,0.5);background:radial-gradient(circle at 0 100%,transparent 52%,rgba(226,232,240,0.55) 53%,rgba(226,232,240,0.55) 63%,transparent 64%);}
-.net-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:.75rem;color:var(--muted);}
-.net-lg{display:inline-flex;align-items:center;gap:6px;}
-.net-sw{width:16px;height:10px;border-radius:3px;flex:none;}
-.net-sw.sw-rack{border:1px solid rgba(99,102,241,0.55);background:rgba(99,102,241,0.22);}
-.net-sw.sw-tray{border:1px solid rgba(245,158,11,0.6);background:repeating-linear-gradient(45deg,rgba(245,158,11,0.4) 0 3px,rgba(245,158,11,0.12) 3px 6px);}
-.net-sw.sw-panel{border:1px solid rgba(148,163,184,0.6);background:rgba(148,163,184,0.28);}
+/* =====================================================================
+   Shared Core — room renderer CSS (Phase 1)
+   Namespace: every class is prefixed `sc-` so it cannot collide with
+   either host app. In particular there is NO bare `.tray` class here:
+   Manage's Schedule `.tray { margin-top:14px }` rule silently shifted
+   every cable tray on its map by 14px (Phase 0 quirk (a)); the tray
+   modifier here is `.sc-tray`, always paired with `.sc-item`.
+
+   Canonical geometry policy (see CORE.md):
+   - NO size floors anywhere. No min-width / min-height on map items or
+     racks, at any scale, in any mode. Elements render at their exact
+     footprint (percentages of the map), so there is no equivalent of
+     Manage's `.nr-exact` fitted-map exemption — it is never needed.
+   - Item/rack padding lives on the INNER label wrapper, never on the
+     positioned element itself, so padding can never become a de-facto
+     floor the way Field Kit's `.net-item` padding did at phone scale.
+   - Elevation spacing is Manage's model (the editor is canonical):
+     blocks are block-layout with margin-bottom:2px inside a column
+     padded 10px. Field Kit's flex gap:3px / padding:8px model is NOT
+     used; FK columns shrink ~1px per block (~12px on a 42U column)
+     when it adopts the core.
+
+   Colours resolve through the host app's own CSS variables first
+   (both apps share the dark indigo palette), with literal fallbacks.
+   ===================================================================== */
+
+/* ---------- top-down room map ---------- */
+.sc-map { position:relative; border:1.5px solid var(--line-hover, rgba(255,255,255,.16)); border-radius:14px; background-color:var(--panel2, #161e31); background-image:linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); overflow:hidden; box-sizing:border-box; }
+.sc-map * { box-sizing:border-box; }
+
+.sc-rack { position:absolute; z-index:2; border:1.5px solid var(--line-hover, rgba(255,255,255,.16)); background:var(--panel2, #161e31); border-radius:8px; padding:0; overflow:hidden; color:var(--text, #f8fafc); font:inherit; text-align:left; }
+.sc-rack .sc-rin { display:flex; flex-direction:column; justify-content:center; gap:1px; width:100%; height:100%; padding:5px 8px; overflow:hidden; }
+.sc-rack .sc-rnm { font-weight:800; font-size:12.5px; line-height:1.15; white-space:nowrap; display:block; }
+.sc-rack .sc-rsub { font-family:'JetBrains Mono', monospace; font-size:10px; color:var(--accent-200, #a5b4fc); white-space:nowrap; display:block; }
+.sc-rack.sc-vert .sc-rin { flex-direction:row; align-items:center; justify-content:center; gap:5px; }
+.sc-rack.sc-vert .sc-rnm, .sc-rack.sc-vert .sc-rsub { writing-mode:vertical-rl; }
+
+.sc-item { position:absolute; z-index:1; border-radius:6px; overflow:hidden; display:flex; align-items:center; justify-content:center; padding:0; margin:0; min-width:0; min-height:0; }
+.sc-item.sc-above { z-index:3; }
+.sc-item .sc-inm { font-weight:800; font-size:11.5px; line-height:1.15; white-space:nowrap; padding:2px 6px; }
+.sc-item.sc-tray { border:1.5px solid var(--amber, #f59e0b); color:var(--amber-t, #fcd34d); background-color:rgba(245,158,11,.10); background-image:repeating-linear-gradient(45deg, rgba(245,158,11,.22) 0 7px, transparent 7px 14px), linear-gradient(180deg, transparent calc(50% - 1px), rgba(245,158,11,.75) calc(50% - 1px), rgba(245,158,11,.75) calc(50% + 1px), transparent calc(50% + 1px)); }
+.sc-item.sc-tray.sc-vert { background-image:repeating-linear-gradient(45deg, rgba(245,158,11,.22) 0 7px, transparent 7px 14px), linear-gradient(90deg, transparent calc(50% - 1px), rgba(245,158,11,.75) calc(50% - 1px), rgba(245,158,11,.75) calc(50% + 1px), transparent calc(50% + 1px)); }
+.sc-item.sc-panel { border:1.5px solid #64748b; background:#334155; color:#e2e8f0; border-radius:4px; }
+.sc-item.sc-vert .sc-inm { writing-mode:vertical-rl; }
+/* Doors: the 0.4 ft wall strip itself is transparent; the gap, leaf and
+   swing arc are the SVG the renderer inlines. Overflow must stay
+   visible or the swing arc (drawn outside the strip) is clipped. */
+.sc-item.sc-door { background:transparent; border:none; border-radius:0; overflow:visible; padding:0; }
+.sc-item .sc-doorlab { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:10px; font-weight:800; color:#cbd5e1; text-shadow:0 1px 3px rgba(0,0,0,.85); pointer-events:none; white-space:nowrap; }
+
+/* ---------- editable-mode affordances ---------- */
+.sc-map.sc-edit .sc-rack, .sc-map.sc-edit .sc-item { cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+.sc-map.sc-edit .sc-rack:active, .sc-map.sc-edit .sc-item:active { cursor:grabbing; }
+.sc-map.sc-edit .sc-rack { cursor:grab; }
+.sc-sel { border-color:var(--accent, #6366f1) !important; box-shadow:0 0 0 3px rgba(99,102,241,.28), 0 8px 22px rgba(0,0,0,.4); }
+.sc-item.sc-drag { z-index:8; }
+.sc-rsz { position:absolute; right:0; bottom:0; width:16px; height:16px; cursor:nwse-resize; touch-action:none; z-index:9; background:linear-gradient(135deg, transparent 50%, rgba(99,102,241,.85) 50%); border-radius:0 0 6px 0; }
+
+/* ---------- read-only mode (Field Kit semantics) ----------
+   Items never swallow a tap meant for a rack underneath them: every
+   item is pointer-events:none, exactly as FK's `.net-item` is today.
+   Racks stay activatable (they are <button>s in this mode). */
+.sc-map.sc-ro .sc-item { pointer-events:none; }
+.sc-map.sc-ro .sc-rack { cursor:pointer; }
+.sc-map.sc-ro button.sc-rack { appearance:none; -webkit-appearance:none; }
+
+/* ---------- legend (opt-in; FK shows one today, Manage does not) ---------- */
+.sc-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:.75rem; color:var(--muted, #94a3b8); }
+.sc-lg { display:inline-flex; align-items:center; gap:6px; }
+.sc-sw { width:16px; height:10px; border-radius:3px; flex:none; display:inline-block; }
+.sc-sw.sc-sw-rack { border:1px solid rgba(99,102,241,.55); background:rgba(99,102,241,.22); }
+.sc-sw.sc-sw-tray { border:1px solid rgba(245,158,11,.6); background:repeating-linear-gradient(45deg, rgba(245,158,11,.4) 0 3px, rgba(245,158,11,.12) 3px 6px); }
+.sc-sw.sc-sw-panel { border:1px solid rgba(148,163,184,.6); background:rgba(148,163,184,.28); }
+.sc-sw.sc-sw-door { border:1px solid rgba(226,232,240,.5); background:radial-gradient(circle at 0 100%, transparent 52%, rgba(226,232,240,.55) 53%, rgba(226,232,240,.55) 63%, transparent 64%); }
+
+/* ---------- rack elevation ---------- */
+.sc-rackcol { border:1px solid var(--line-hover, rgba(255,255,255,.16)); border-radius:16px; background:var(--panel, #0f1523); padding:10px; box-sizing:border-box; }
+.sc-rackcol * { box-sizing:border-box; }
+.sc-block { display:flex; align-items:stretch; gap:8px; margin-bottom:2px; }
+.sc-block:last-child { margin-bottom:2px; }
+.sc-ulab { flex:none; width:52px; display:flex; align-items:center; justify-content:flex-end; font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--muted-dark, #64748b); padding-right:2px; }
+.sc-dev { flex:1; min-width:0; border:1px solid var(--line, rgba(255,255,255,.08)); border-radius:8px; background:var(--panel2, #161e31); color:var(--text, #f8fafc); padding:0 10px; display:flex; align-items:center; gap:8px; overflow:hidden; }
+.sc-dev .sc-dn { font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sc-dev .sc-dt { color:var(--muted, #94a3b8); font-size:12px; white-space:nowrap; }
+.sc-dev.sc-t-switch { border-color:rgba(99,102,241,.55); background:linear-gradient(180deg, rgba(99,102,241,.22), rgba(99,102,241,.10)); }
+.sc-dev.sc-t-ups { border-color:rgba(16,185,129,.45); }
+.sc-dev.sc-t-pdu { border-color:rgba(245,158,11,.5); }
+.sc-dev.sc-t-blank, .sc-dev.sc-t-cable_manager { border-style:dashed; color:var(--muted, #94a3b8); background:transparent; }
+.sc-elev.sc-edit .sc-dev { cursor:pointer; }
+.sc-elev.sc-edit .sc-dev:hover { border-color:var(--line-hover, rgba(255,255,255,.16)); }
+.sc-dev.sc-seldev { border-color:var(--accent, #6366f1); box-shadow:0 0 0 3px rgba(99,102,241,.22); }
+.sc-ticks { margin-left:auto; flex:none; width:34%; max-width:190px; height:12px; border-radius:3px; background-image:repeating-linear-gradient(90deg, rgba(165,180,252,.55) 0 5px, transparent 5px 10px); }
+.sc-portsbtn { margin-left:auto; flex:none; border:1px solid rgba(165,180,252,.5); background:rgba(99,102,241,.25); color:#e0e7ff; border-radius:999px; padding:4px 11px; font-size:12px; font-weight:800; cursor:pointer; font-family:inherit; }
+.sc-portsbtn:hover { background:rgba(99,102,241,.4); }
+.sc-empty { flex:1; border:1px dashed rgba(255,255,255,.09); border-radius:8px; background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.018) 0 10px, transparent 10px 20px); display:flex; align-items:center; padding:0 10px; color:var(--muted-dark, #64748b); font-size:12px; }
+.sc-elev.sc-edit .sc-empty { cursor:pointer; }
+.sc-elev.sc-edit .sc-empty:hover { border-color:var(--line-hover, rgba(255,255,255,.16)); color:var(--muted, #94a3b8); }
+
+@media (max-width:700px) {
+  .sc-rack .sc-rnm { font-size:11px; }
+  .sc-rack .sc-rsub { font-size:9px; }
+  .sc-item .sc-inm { font-size:10px; }
+  .sc-ulab { width:44px; font-size:9.5px; }
+  .sc-dev .sc-dn { font-size:12px; }
+  .sc-dev .sc-dt { display:none; }
+}
 .net-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;margin-bottom:10px;}
 .net-chip{flex:0 0 auto;background:var(--chip);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:7px 13px;font:inherit;font-size:.85rem;cursor:pointer;}
 .net-chip.on{background:rgba(99,102,241,0.25);border-color:rgba(99,102,241,0.45);color:#c7d2fe;font-weight:700;}
-.net-rackcol{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:8px;display:flex;flex-direction:column;gap:3px;}
-.net-block{display:flex;align-items:stretch;gap:8px;}
-.net-ulab{flex:0 0 52px;font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--muted-dark);display:flex;align-items:center;}
-.net-dev{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:0 10px;display:flex;align-items:center;gap:8px;overflow:hidden;}
-.net-dev .dn{font-weight:700;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.net-dev .dt{color:var(--muted);font-size:.78rem;white-space:nowrap;}
-.net-dev.t-switch{border-color:rgba(99,102,241,0.55);background:linear-gradient(180deg, rgba(99,102,241,0.22), rgba(99,102,241,0.10));}
-.net-dev.t-ups{border-color:rgba(16,185,129,0.45);}
-.net-dev.t-pdu{border-color:rgba(245,158,11,0.5);}
-.net-dev.t-blank,.net-dev.t-cable_manager{border-style:dashed;color:var(--muted);background:transparent;}
-.net-ticks{margin-left:auto;flex:none;width:34%;max-width:190px;height:12px;border-radius:3px;background-image:repeating-linear-gradient(90deg, rgba(165,180,252,0.55) 0 5px, transparent 5px 10px);}
-.net-portsbtn{margin-left:auto;flex:none;background:rgba(99,102,241,0.28);border:1px solid rgba(99,102,241,0.5);color:#e0e7ff;border-radius:999px;padding:5px 12px;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer;}
-.net-empty{flex:1;border:1px dashed rgba(255,255,255,0.09);border-radius:8px;background-image:repeating-linear-gradient(45deg, rgba(255,255,255,0.018) 0 10px, transparent 10px 20px);display:flex;align-items:center;padding:0 10px;color:var(--muted-dark);font-size:.78rem;}
 .net-banner{border:1px solid rgba(99,102,241,0.45);background:rgba(99,102,241,0.13);border-radius:12px;padding:11px 13px;font-size:.9rem;margin-bottom:12px;}
 .net-rrow{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;border-bottom:1px solid var(--line);color:var(--text);font:inherit;text-align:left;padding:10px 2px;cursor:pointer;}
 
@@ -971,7 +1040,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.18';
+var APP_VERSION='5.19';
 var DEMO=/[?&]demo\b/.test(location.search); // v5.16: sign-in-free demo mode (?demo) — see the demo block before the auth section
 var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
@@ -2333,7 +2402,7 @@ function renderProject(){
   $('app').innerHTML=h;
   var body=$('tabBody');
   if(curTab==='overview')body.innerHTML=overviewHTML(p);
-  else if(curTab==='network')body.innerHTML=networkHTML(p);
+  else if(curTab==='network'){body.innerHTML=networkHTML(p);netWireCore();}
   else if(curTab==='time')body.innerHTML=timeHTML(p);
   else if(curTab==='storage'){body.innerHTML=storageHTML(p);storageRecalc(p);}
   else if(curTab==='poe')body.innerHTML=poeHTML(p);
@@ -2633,6 +2702,563 @@ function cableHistoryHTML(p){
     +'<div class="kv" style="margin-top:8px"><span class="mut">Project total</span><b>'+projectCableFt(p.id)+' ft</b></div></div>';
   return h;
 }
+/* =====================================================================
+   Shared Core — room renderer (Phase 1)
+   One renderer for the network-room map + rack elevation, shared by
+   Field Kit (view-only) and Field Kit Manage (editor). Plain script:
+   no modules, no imports/exports — at ship time each app inlines this
+   file (and room-renderer.css) at its include marker; see CORE.md.
+
+   Namespace: window.SCR. Collision-checked against both apps
+   (Field Kit v5.18, Manage v1.16.6): neither defines a global `SCR`
+   (the only "SCR" bytes in either file are inside the bundled
+   Supabase client's SUBSCRIBED enum), and every CSS class here is
+   prefixed `sc-`.
+
+   Canonical decisions (full rationale in CORE.md):
+   - Footprints are EXACT at every scale. No min-size floors anywhere
+     (Manage's .nr-item 30x14px floors and FK's rack 48x38px floors
+     are deliberately NOT carried over).
+   - Manage's .tray margin-top collision is NOT carried over: core
+     classes are sc-prefixed and .sc-item sets margin:0.
+   - DOORS use Manage's model as canonical: a 0.4 ft strip centred on
+     the wall line, wall re-derived from map_rot alone, with gap +
+     leaf + swing-arc SVG. FK's size_w-square door model is dropped
+     (it rendered Manage-canonical S/E doors ~invisible).
+   - Elevation spacing is Manage's: u_size x 26px blocks, block
+     layout, margin-bottom:2px, column padding 10px. (FK's flex
+     gap:3px model drifts +1px/block; a 42U FK column shrinks ~12px.)
+   - Labels use Manage's superset conventions by default: trays get
+     " · N in" (size_d x 12), elevation switches get " · N-port".
+     opts.labels can turn either off (Field Kit's bare-label mode).
+   - Long labels clip symmetrically (Manage): nowrap, no ellipsis,
+     centred inside an overflow:hidden item.
+   ===================================================================== */
+window.SCR = (function () {
+  'use strict';
+
+  var ROW = 26;          /* px per rack U — NR_ROW / NET_ROW in both apps */
+  var DOOR_T = 0.4;      /* door strip thickness, ft (Manage nrDoorStyle) */
+  var SNAP = 0.5;        /* drag snap, ft (Manage editor) */
+  var TYPES = [['switch', 'Switch'], ['patch_panel', 'Patch panel'], ['ups', 'UPS'], ['nvr_server', 'NVR / Server'], ['router_firewall', 'Router / Firewall'], ['pdu', 'PDU'], ['cable_manager', 'Cable manager'], ['blank', 'Blank'], ['other', 'Other']];
+
+  /* ---------- basics ---------- */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function num(v, dflt) { var n = Number(v); return isFinite(n) ? n : (dflt || 0); }
+  function typeLabel(t) { for (var i = 0; i < TYPES.length; i++) if (TYPES[i][0] === t) return TYPES[i][1]; return 'Other'; }
+  function normRot(rot) { return ((num(rot) % 360) + 360) % 360; }
+  function isVert(rot) { return (normRot(rot) % 180) !== 0; }
+  function pct(part, whole) { return (num(part) / num(whole) * 100) + '%'; }
+
+  /* ---------- footprint geometry (the shared math, Phase 0) ---------- */
+  /* Odd rotation swaps the axes: footprint w = size_d, d = size_w. */
+  function itemFoot(it) {
+    var rot = isVert(it.map_rot);
+    return { fw: rot ? num(it.size_d) : num(it.size_w), fd: rot ? num(it.size_w) : num(it.size_d), rot: rot };
+  }
+  function rackFoot(r) {
+    var rot = isVert(r.map_rot);
+    return { fw: rot ? num(r.fp_d) : num(r.fp_w), fd: rot ? num(r.fp_w) : num(r.fp_d), rot: rot };
+  }
+  /* Layer: stored value wins; unset, trays ride above, the rest below.
+     (Manage nrItemLayer / FK netItemAbove — identical rules.) */
+  function itemLayer(it) {
+    if (it.layer === 'above' || it.layer === 'below') return it.layer;
+    return it.type === 'cable_tray' ? 'above' : 'below';
+  }
+  function trayWidthIn(it) { return Math.round(num(it.size_d) * 12); }
+
+  function clampToRoom(x, y, fw, fd, room) {
+    var w = num(room.width_ft, 14), d = num(room.depth_ft, 10);
+    return {
+      x: Math.min(Math.max(num(x), 0), Math.max(0, w - fw)),
+      y: Math.min(Math.max(num(y), 0), Math.max(0, d - fd))
+    };
+  }
+  function clampRack(rack, room) {
+    var f = rackFoot(rack), p = clampToRoom(rack.map_x, rack.map_y, f.fw, f.fd, room);
+    rack.map_x = p.x; rack.map_y = p.y; return rack;
+  }
+  function clampItem(it, room) {
+    if (it.type === 'door') { doorSet(it, room, doorWall(it), doorSpan(it)); return it; }
+    var f = itemFoot(it), p = clampToRoom(it.map_x, it.map_y, f.fw, f.fd, room);
+    it.map_x = p.x; it.map_y = p.y; return it;
+  }
+  /* Form size rules from Manage's edit dialogs (the only "resize"
+     either app has today — there are no map resize handles in
+     v1.16.6/v5.18): items length >= 0.5, width/depth >= 0.25,
+     doors width >= 1. Used by the opt-in map resize handle. */
+  function sizeRules(kind, obj) {
+    if (kind === 'item' && obj && obj.type === 'door') return { minW: 1, minD: 0, step: 0.25 };
+    if (kind === 'item') return { minW: 0.5, minD: 0.25, step: 0.25 };
+    return { minW: 0.5, minD: 0.5, step: 0.25 };
+  }
+  function clampSize(kind, obj, wFt, dFt) {
+    var r = sizeRules(kind, obj);
+    return { w: Math.max(r.minW, wFt), d: Math.max(r.minD, dFt) };
+  }
+  /* Rotation, Manage semantics, returned as a NEW geometry object
+     (the core never mutates app state outside the clamp/doorSet
+     helpers the editor already treats as mutating): rot +90 in
+     90-degree steps, position re-clamped with the swapped footprint.
+     Doors rotate to the next wall (n->e->s->w) keeping their span. */
+  function rotateRackGeom(rack, room) {
+    var tmp = { map_rot: (normRot(rack.map_rot) + 90) % 360, map_x: num(rack.map_x), map_y: num(rack.map_y), fp_w: rack.fp_w, fp_d: rack.fp_d };
+    var f = rackFoot(tmp), p = clampToRoom(tmp.map_x, tmp.map_y, f.fw, f.fd, room);
+    return { x: p.x, y: p.y, rot: tmp.map_rot, w: num(rack.fp_w), d: num(rack.fp_d) };
+  }
+  function rotateItemGeom(it, room) {
+    if (it.type === 'door') {
+      var order = ['n', 'e', 's', 'w'], cur = doorWall(it);
+      var tmp = { type: 'door', size_w: it.size_w, size_d: it.size_d, map_rot: it.map_rot, map_x: it.map_x, map_y: it.map_y };
+      doorSet(tmp, room, order[(order.indexOf(cur) + 1) % 4], doorSpan(it));
+      return { x: num(tmp.map_x), y: num(tmp.map_y), rot: normRot(tmp.map_rot), w: num(it.size_w), d: num(it.size_d) };
+    }
+    var t2 = { map_rot: (normRot(it.map_rot) + 90) % 360, map_x: num(it.map_x), map_y: num(it.map_y), size_w: it.size_w, size_d: it.size_d };
+    var f = itemFoot(t2), p = clampToRoom(t2.map_x, t2.map_y, f.fw, f.fd, room);
+    return { x: p.x, y: p.y, rot: t2.map_rot, w: num(it.size_w), d: num(it.size_d) };
+  }
+
+  /* ---------- doors (Manage model, canonical) ---------- */
+  function doorWall(it) { var r = normRot(it.map_rot); return r === 90 ? 'e' : r === 180 ? 's' : r === 270 ? 'w' : 'n'; }
+  function doorSpan(it) { var wall = doorWall(it); return (wall === 'n' || wall === 's') ? num(it.map_x) : num(it.map_y); }
+  function doorSet(it, room, wall, span) {
+    var W = num(it.size_w) || 3;
+    var w = num(room.width_ft, 14), d = num(room.depth_ft, 10);
+    var len = (wall === 'n' || wall === 's') ? w : d;
+    span = Math.min(Math.max(num(span), 0), Math.max(0, len - W));
+    it.map_rot = wall === 'e' ? 90 : wall === 's' ? 180 : wall === 'w' ? 270 : 0;
+    if (wall === 'n') { it.map_x = span; it.map_y = 0; }
+    else if (wall === 's') { it.map_x = span; it.map_y = d; }
+    else if (wall === 'e') { it.map_x = w; it.map_y = span; }
+    else { it.map_x = 0; it.map_y = span; }
+    return it;
+  }
+  function doorCenter(it, room) {
+    var wall = doorWall(it), W = num(it.size_w) || 3;
+    var w = num(room.width_ft, 14), d = num(room.depth_ft, 10);
+    if (wall === 'n') return { x: num(it.map_x) + W / 2, y: 0 };
+    if (wall === 's') return { x: num(it.map_x) + W / 2, y: d };
+    if (wall === 'e') return { x: w, y: num(it.map_y) + W / 2 };
+    return { x: 0, y: num(it.map_y) + W / 2 };
+  }
+  /* The strip's own box: thickness DOOR_T centred on the wall line.
+     Its top-left in feet (for measurement) is therefore -0.2 ft
+     outside the room on the wall axis. */
+  function doorStripFt(it, room) {
+    var wall = doorWall(it), W = num(it.size_w) || 3;
+    var w = num(room.width_ft, 14), d = num(room.depth_ft, 10);
+    if (wall === 'n') return { x: num(it.map_x), y: -DOOR_T / 2, w: W, h: DOOR_T };
+    if (wall === 's') return { x: num(it.map_x), y: d - DOOR_T / 2, w: W, h: DOOR_T };
+    if (wall === 'e') return { x: w - DOOR_T / 2, y: num(it.map_y), w: DOOR_T, h: W };
+    return { x: -DOOR_T / 2, y: num(it.map_y), w: DOOR_T, h: W };
+  }
+  function doorStyle(it, w, d) {
+    var wall = doorWall(it), W = num(it.size_w) || 3, T = DOOR_T;
+    if (wall === 'n' || wall === 's') return { left: pct(it.map_x, w), top: wall === 'n' ? '0%' : '100%', width: pct(W, w), height: pct(T, d), transform: 'translateY(-50%)' };
+    return { left: wall === 'w' ? '0%' : '100%', top: pct(it.map_y, d), width: pct(T, w), height: pct(W, d), transform: 'translateX(-50%)' };
+  }
+  /* Plan symbol (ported from Manage nrDoorSVG): a gap line across the
+     wall, the leaf, and a quarter-circle swing arc, in an SVG square
+     of side size_w that overflows the strip on the swing side. */
+  function doorSVG(it) {
+    var W = num(it.size_w) || 3, wall = doorWall(it), swing = it.door_swing || 'in', hinge = it.door_hinge || 'left';
+    var uh = ((wall === 'n' || wall === 'e') === (hinge === 'left')) ? 0 : W;
+    var vin = swing === 'in' ? W : -W;
+    function pt(u, v) {
+      if (wall === 'n') return swing === 'in' ? [u, v] : [u, v + W];
+      if (wall === 's') return swing === 'in' ? [u, W - v] : [u, -v];
+      if (wall === 'e') return swing === 'in' ? [W - v, u] : [-v, u];
+      return swing === 'in' ? [v, u] : [W + v, u];
+    }
+    function R(n) { return Math.round(n * 100) / 100; }
+    function P(p) { return R(p[0]) + ',' + R(p[1]); }
+    var H = pt(uh, 0), C = pt(W - uh, 0), O = pt(uh, vin), G0 = pt(0, 0), G1 = pt(W, 0);
+    var arc = [];
+    for (var i = 0; i <= 8; i++) { var t = i / 8 * Math.PI / 2; arc.push(P(pt(uh + (W - 2 * uh) * Math.cos(t), vin * Math.sin(t)))); }
+    var horiz = wall === 'n' || wall === 's', pos;
+    if (horiz) pos = 'left:0;width:100%;aspect-ratio:1;' + ((wall === 'n') === (swing === 'in') ? 'top:50%;' : 'bottom:50%;');
+    else pos = 'top:0;height:100%;aspect-ratio:1;' + ((wall === 'e') === (swing === 'in') ? 'right:50%;' : 'left:50%;');
+    return '<svg viewBox="0 0 ' + W + ' ' + W + '" style="position:absolute;pointer-events:none;overflow:visible;' + pos + '" aria-hidden="true">'
+      + '<line x1="' + R(G0[0]) + '" y1="' + R(G0[1]) + '" x2="' + R(G1[0]) + '" y2="' + R(G1[1]) + '" style="stroke:var(--panel, #0f1523)" stroke-width="0.18"/>'
+      + '<polyline points="' + arc.join(' ') + '" fill="none" stroke="#94a3b8" stroke-width="0.05"/>'
+      + '<line x1="' + R(H[0]) + '" y1="' + R(H[1]) + '" x2="' + R(O[0]) + '" y2="' + R(O[1]) + '" stroke="#e2e8f0" stroke-width="0.09"/>'
+      + '<circle cx="' + R(H[0]) + '" cy="' + R(H[1]) + '" r="0.1" fill="#e2e8f0"/></svg>';
+  }
+
+  /* ---------- fit (Manage nrFitMap, generalised) ----------
+     Largest room-aspect box fitting availW x availH. `exact` reports
+     pxPerFt < 44 — informational only now: Manage used it to switch
+     its floor exemption on; the core has no floors to exempt. */
+  function fitSize(room, availW, availH) {
+    var w = num(room.width_ft, 14), d = num(room.depth_ft, 10);
+    if (!(availW > 0) || !(availH > 0)) return null;
+    var s = Math.min(availW / w, availH / d);
+    return { widthPx: Math.floor(w * s), heightPx: Math.floor(d * s), pxPerFt: s, exact: s < 44 };
+  }
+
+  /* ---------- labels ---------- */
+  function labelsOf(opts) {
+    var L = (opts && opts.labels) || {};
+    return {
+      trayWidthIn: L.trayWidthIn !== false,     /* Manage default ON; FK today: off (bare name) */
+      switchPorts: L.switchPorts !== false      /* Manage default ON; FK today: off */
+    };
+  }
+  function itemLabel(it, opts) {
+    var L = labelsOf(opts);
+    if (it.type === 'cable_tray') {
+      var base = it.name || 'Cable tray';
+      return L.trayWidthIn ? base + ' · ' + trayWidthIn(it) + ' in' : base;
+    }
+    return it.name || 'Wall panel';
+  }
+  function rackSublabel(rack, devCount) { return (rack.height_u || 42) + 'U · ' + devCount + ' devices'; }
+
+  /* ---------- room map ----------
+     renderRoomMap(room, racks, items, opts) -> HTML string.
+     DOM order mirrors Manage (items in given order, then racks);
+     paint order is by z-index, not DOM: below items 1, racks 2,
+     above items 3 — the stacking both apps agree on. */
+  function renderRoomMap(room, racks, items, opts) {
+    opts = opts || {};
+    var E = opts.esc || esc;
+    var editable = !!opts.editable;
+    var w = num(room.width_ft, 14), d = num(room.depth_ft, 10);
+    var counts = opts.deviceCounts || null;
+    if (!counts && opts.devices) {
+      counts = {};
+      opts.devices.forEach(function (dv) { if (!dv.deleted_at) counts[dv.rack_id] = (counts[dv.rack_id] || 0) + 1; });
+    }
+    var style = '';
+    if (opts.fit && opts.fit.widthPx) style = 'width:' + opts.fit.widthPx + 'px;height:' + opts.fit.heightPx + 'px';
+    else style = 'aspect-ratio:' + w + '/' + d;
+    style += ';background-size:' + (50 / w) + '% ' + (50 / d) + '%';
+    var h = '<div class="sc-map' + (editable ? ' sc-edit' : ' sc-ro') + '"' + (opts.mapId ? ' id="' + E(opts.mapId) + '"' : '') + ' style="' + style + '">';
+    (items || []).forEach(function (it) {
+      if (it.deleted_at) return;
+      var layer = itemLayer(it);
+      var sel = editable && opts.selectedItemId === it.id ? ' sc-sel' : '';
+      if (it.type === 'door') {
+        var dst = doorStyle(it, w, d);
+        h += '<div class="sc-item sc-door' + (layer === 'above' ? ' sc-above' : '') + sel + '" data-scitem="' + E(it.id) + '" data-sckind="item" title="Door' + (it.name ? ' — ' + E(it.name) : '') + '" style="left:' + dst.left + ';top:' + dst.top + ';width:' + dst.width + ';height:' + dst.height + ';transform:' + dst.transform + '">'
+          + doorSVG(it) + (it.name ? '<span class="sc-doorlab">' + E(it.name) + '</span>' : '') + '</div>';
+        return;
+      }
+      var f = itemFoot(it);
+      h += '<div class="sc-item ' + (it.type === 'cable_tray' ? 'sc-tray' : 'sc-panel') + (layer === 'above' ? ' sc-above' : '') + sel + (f.rot ? ' sc-vert' : '') + '" data-scitem="' + E(it.id) + '" data-sckind="item" style="left:' + pct(it.map_x, w) + ';top:' + pct(it.map_y, d) + ';width:' + pct(f.fw, w) + ';height:' + pct(f.fd, d) + '">'
+        + '<span class="sc-inm">' + E(itemLabel(it, opts)) + '</span></div>';
+    });
+    (racks || []).forEach(function (r) {
+      if (r.deleted_at) return;
+      var f2 = rackFoot(r);
+      var sel2 = editable && opts.selectedRackId === r.id ? ' sc-sel' : '';
+      var inner = '<span class="sc-rin"><span class="sc-rnm">' + E(r.name) + '</span><span class="sc-rsub">' + E(rackSublabel(r, counts ? (counts[r.id] || 0) : 0)) + '</span></span>';
+      var st = ' style="left:' + pct(r.map_x, w) + ';top:' + pct(r.map_y, d) + ';width:' + pct(f2.fw, w) + ';height:' + pct(f2.fd, d) + '"';
+      if (editable) h += '<div class="sc-rack' + sel2 + (f2.rot ? ' sc-vert' : '') + '" data-scrack="' + E(r.id) + '" data-sckind="rack"' + st + '>' + inner + '</div>';
+      else h += '<button type="button" class="sc-rack' + (f2.rot ? ' sc-vert' : '') + '" data-scrack="' + E(r.id) + '" data-sckind="rack"' + st + '>' + inner + '</button>';
+    });
+    h += '</div>';
+    if (opts.legend) {
+      h += '<div class="sc-legend"><span class="sc-lg"><span class="sc-sw sc-sw-rack"></span>Rack</span><span class="sc-lg"><span class="sc-sw sc-sw-tray"></span>Cable tray</span><span class="sc-lg"><span class="sc-sw sc-sw-panel"></span>Wall panel</span><span class="sc-lg"><span class="sc-sw sc-sw-door"></span>Door</span></div>';
+    }
+    return h;
+  }
+
+  /* ---------- rack elevation ----------
+     Blocks run bottom-up (U1 at the bottom): the column is built
+     from the top U down, devices keyed by their top unit, empty
+     runs aggregated into one block — both apps' algorithm, kept. */
+  function elevBlocks(rack, devices) {
+    var height = rack.height_u || 42;
+    var byTop = {}, covered = {};
+    (devices || []).forEach(function (dv) {
+      if (dv.deleted_at) return;
+      byTop[dv.u_start + (dv.u_size || 1) - 1] = dv;
+      for (var u = dv.u_start; u < dv.u_start + (dv.u_size || 1); u++) covered[u] = dv;
+    });
+    var blocks = [], u = height;
+    while (u >= 1) {
+      if (byTop[u]) {
+        var dv = byTop[u], sz = dv.u_size || 1;
+        blocks.push({ kind: 'dev', device: dv, uStart: dv.u_start, uSize: sz, label: sz > 1 ? 'U' + dv.u_start + '–' + (dv.u_start + sz - 1) : 'U' + dv.u_start });
+        u -= sz;
+      } else {
+        var top = u; while (u >= 1 && !covered[u]) u--;
+        var bot = u + 1, n = top - bot + 1;
+        blocks.push({ kind: 'empty', uStart: bot, uSize: n, label: n > 1 ? 'U' + bot + '–' + top : 'U' + top });
+      }
+    }
+    return blocks;
+  }
+  function renderElevation(rack, devices, opts) {
+    opts = opts || {};
+    var E = opts.esc || esc;
+    var L = labelsOf(opts);
+    var editable = !!opts.editable;
+    var h = '<div class="sc-rackcol sc-elev' + (editable ? ' sc-edit' : ' sc-ro') + '">';
+    elevBlocks(rack, devices).forEach(function (b) {
+      if (b.kind === 'dev') {
+        var dv = b.device;
+        var portTxt = '';
+        if (dv.type === 'switch' && dv.switch_id && L.switchPorts && typeof opts.portCountFor === 'function') {
+          var pc = opts.portCountFor(dv.switch_id);
+          if (pc) portTxt = ' · ' + pc + '-port';
+        }
+        h += '<div class="sc-block" style="height:' + (b.uSize * ROW) + 'px"><span class="sc-ulab">' + b.label + '</span>'
+          + '<div class="sc-dev sc-t-' + E(dv.type) + (editable && opts.selectedDeviceId === dv.id ? ' sc-seldev' : '') + '" data-scdev="' + E(dv.id) + '">'
+          + '<span class="sc-dn">' + E(dv.name) + '</span><span class="sc-dt">· ' + E(typeLabel(dv.type)) + portTxt + '</span>'
+          + (dv.type === 'patch_panel' ? '<span class="sc-ticks"></span>' : '')
+          + (dv.type === 'switch' && dv.switch_id ? '<button type="button" class="sc-portsbtn" data-scports="' + E(dv.switch_id) + '">Ports ›</button>' : '')
+          + '</div></div>';
+      } else {
+        h += '<div class="sc-block" style="height:' + (b.uSize * ROW) + 'px"><span class="sc-ulab">' + b.label + '</span>'
+          + '<div class="sc-empty"' + (editable ? ' data-scempty="' + b.uStart + ':' + (b.uStart + b.uSize - 1) + '"' : '') + '>Empty — ' + b.uSize + 'U free</div></div>';
+      }
+    });
+    return h + '</div>';
+  }
+
+  /* ---------- map interactions ----------
+     Port of Manage's wireNRMapDrag + wireNRItemDrag behaviour:
+     - pointer drag with a 3px move threshold; below it, a tap
+     - positions clamp inside the room by footprint; trays/panels may
+       overlap racks and each other freely (no collision rules)
+     - drop snaps to 0.5 ft and reports through onDragEnd in FEET;
+       the core never writes app state — the app persists + re-renders
+     - doors drag by their centre to the nearest wall, snap to it,
+       and slide along it (span snapped 0.5 ft on drop)
+     - selection is single (rack XOR item), Manage-style: selecting
+       one clears the other; pointerdown on empty map clears it
+     Read-only mode wires activation taps only: racks report through
+     onRackActivate; items are pointer-events:none (CSS) so taps pass
+     through to whatever is beneath, exactly as in FK today.
+     opts.resizeHandles (default FALSE — neither app has map resize
+     handles today; sizing lives in their Edit forms) adds a corner
+     handle to the selected element that resizes by footprint under
+     sizeRules(), snapped to 0.25 ft, reported via onDragEnd. */
+  function attachMapInteractions(rootEl, opts) {
+    opts = opts || {};
+    var map = rootEl.classList && rootEl.classList.contains('sc-map') ? rootEl : rootEl.querySelector('.sc-map');
+    if (!map) return { detach: function () {} };
+    var room = opts.room;
+    var racks = opts.racks || [], items = opts.items || [];
+    var cleanups = [];
+    function on(el, ev, fn) { el.addEventListener(ev, fn); cleanups.push(function () { el.removeEventListener(ev, fn); }); }
+    function rackById(id) { for (var i = 0; i < racks.length; i++) if (racks[i].id === id) return racks[i]; return null; }
+    function itemById(id) { for (var i = 0; i < items.length; i++) if (items[i].id === id) return items[i]; return null; }
+    function selectVisual(kind, id) {
+      Array.prototype.forEach.call(map.querySelectorAll('.sc-rack, .sc-item'), function (x) { x.classList.remove('sc-sel'); });
+      Array.prototype.forEach.call(map.querySelectorAll('.sc-rsz'), function (x) { x.parentNode.removeChild(x); });
+      if (!kind || !id) return;
+      var el = map.querySelector(kind === 'rack' ? '[data-scrack="' + id + '"]' : '[data-scitem="' + id + '"]');
+      if (el) {
+        el.classList.add('sc-sel');
+        if (opts.resizeHandles) {
+          var hd = document.createElement('span');
+          hd.className = 'sc-rsz'; hd.setAttribute('data-scrsz', '1');
+          el.appendChild(hd);
+          wireResize(el, hd, kind, kind === 'rack' ? rackById(id) : itemById(id));
+        }
+      }
+    }
+    function fireSelect(kind, id) { selectVisual(kind, id); if (typeof opts.onSelect === 'function') opts.onSelect(kind, id); }
+    function fireDragEnd(kind, id, g) { if (typeof opts.onDragEnd === 'function') opts.onDragEnd(kind, id, g); }
+
+    if (!opts.editable) {
+      Array.prototype.forEach.call(map.querySelectorAll('[data-scrack]'), function (b) {
+        on(b, 'click', function () { if (typeof opts.onRackActivate === 'function') opts.onRackActivate(b.getAttribute('data-scrack')); });
+      });
+      return { detach: detach };
+    }
+
+    on(map, 'pointerdown', function (e) {
+      if (e.target !== map) return;
+      if (map.querySelector('.sc-sel')) fireSelect(null, null);
+    });
+
+    function dragGeom(kind, obj) {
+      if (kind === 'rack') return { w: num(obj.fp_w), d: num(obj.fp_d) };
+      return { w: num(obj.size_w), d: num(obj.size_d) };
+    }
+    function wireResize(el, hd, kind, obj) {
+      if (!obj || !room) return;
+      on(hd, 'pointerdown', function (e) {
+        e.stopPropagation(); e.preventDefault();
+        var rect = map.getBoundingClientRect();
+        var w = num(room.width_ft, 14), d = num(room.depth_ft, 10);
+        var isDoor = kind === 'item' && obj.type === 'door';
+        var f0 = isDoor ? { fw: num(obj.size_w) || 3, fd: DOOR_T } : (kind === 'rack' ? rackFoot(obj) : itemFoot(obj));
+        var sx = e.clientX, sy = e.clientY, nw = f0.fw, nd = f0.fd;
+        try { hd.setPointerCapture(e.pointerId); } catch (err) {}
+        function mv(ev) {
+          nw = f0.fw + (ev.clientX - sx) / rect.width * w;
+          nd = f0.fd + (ev.clientY - sy) / rect.height * d;
+          var cs = clampSize(kind, obj, nw, nd);
+          nw = Math.min(cs.w, (kind === 'rack' ? w - num(obj.map_x) : w - num(obj.map_x)) || cs.w);
+          nd = Math.min(cs.d, d - num(obj.map_y));
+          if (!isDoor) { el.style.width = pct(nw, w); el.style.height = pct(nd, d); }
+        }
+        function up() {
+          hd.removeEventListener('pointermove', mv); hd.removeEventListener('pointerup', up); hd.removeEventListener('pointercancel', up);
+          var step = sizeRules(kind, obj).step;
+          var fw = Math.round(nw / step) * step, fd = Math.round(nd / step) * step;
+          var cs = clampSize(kind, obj, fw, fd);
+          var g = dragGeom(kind, obj);
+          if (isDoor) g.w = cs.w;
+          else if (isVert(obj.map_rot)) { g.w = cs.d; g.d = cs.w; }
+          else { g.w = cs.w; g.d = cs.d; }
+          fireDragEnd(kind, obj.id, { x: num(obj.map_x), y: num(obj.map_y), rot: normRot(obj.map_rot), w: g.w, d: g.d });
+        }
+        hd.addEventListener('pointermove', mv); hd.addEventListener('pointerup', up); hd.addEventListener('pointercancel', up);
+      });
+    }
+
+    function wireDrag(el, kind, obj) {
+      on(el, 'pointerdown', function (e) {
+        if (e.target && e.target.getAttribute && e.target.getAttribute('data-scrsz')) return;
+        if (!obj || !room) return;
+        fireSelect(kind, obj.id);
+        var rect = map.getBoundingClientRect();
+        var w = num(room.width_ft, 14), d = num(room.depth_ft, 10);
+        var isDoor = kind === 'item' && obj.type === 'door';
+        var f = isDoor ? null : (kind === 'rack' ? rackFoot(obj) : itemFoot(obj));
+        var ctr = isDoor ? doorCenter(obj, room) : null;
+        var sx = e.clientX, sy = e.clientY;
+        var ox = isDoor ? ctr.x : num(obj.map_x), oy = isDoor ? ctr.y : num(obj.map_y);
+        var moved = false, nx = null, ny = null;
+        var doorWallV = isDoor ? doorWall(obj) : null, doorSpanV = isDoor ? doorSpan(obj) : 0, lastWall = doorWallV;
+        el.classList.add('sc-drag');
+        try { el.setPointerCapture(e.pointerId); } catch (err) {}
+        function applyDoor(wall, span) {
+          var tmp = { type: 'door', name: obj.name, size_w: obj.size_w, size_d: obj.size_d, door_swing: obj.door_swing, door_hinge: obj.door_hinge, map_rot: obj.map_rot, map_x: obj.map_x, map_y: obj.map_y };
+          doorSet(tmp, room, wall, span);
+          var st = doorStyle(tmp, w, d);
+          el.style.left = st.left; el.style.top = st.top; el.style.width = st.width; el.style.height = st.height; el.style.transform = st.transform;
+          if (wall !== lastWall) { lastWall = wall; el.innerHTML = doorSVG(tmp) + (obj.name ? '<span class="sc-doorlab">' + (opts.esc || esc)(obj.name) + '</span>' : ''); }
+        }
+        function mv(ev) {
+          var dx = (ev.clientX - sx) / rect.width * w, dy = (ev.clientY - sy) / rect.height * d;
+          if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 3) moved = true;
+          if (isDoor) {
+            var cxp = ox + dx, cyp = oy + dy, W = num(obj.size_w) || 3;
+            var dists = { n: cyp, s: d - cyp, w: cxp, e: w - cxp }, wall = 'n', best = Infinity;
+            ['n', 's', 'w', 'e'].forEach(function (k) { if (dists[k] < best) { best = dists[k]; wall = k; } });
+            var len = (wall === 'n' || wall === 's') ? w : d;
+            doorWallV = wall;
+            doorSpanV = Math.min(Math.max(((wall === 'n' || wall === 's') ? cxp : cyp) - W / 2, 0), Math.max(0, len - W));
+            applyDoor(wall, doorSpanV);
+            return;
+          }
+          var p = clampToRoom(ox + dx, oy + dy, f.fw, f.fd, room);
+          nx = p.x; ny = p.y;
+          el.style.left = pct(nx, w); el.style.top = pct(ny, d);
+        }
+        function up() {
+          el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+          el.classList.remove('sc-drag');
+          var g = dragGeom(kind, obj);
+          if (isDoor) {
+            if (moved) {
+              var tmp = { type: 'door', size_w: obj.size_w, size_d: obj.size_d, map_rot: obj.map_rot, map_x: obj.map_x, map_y: obj.map_y };
+              doorSet(tmp, room, doorWallV, Math.round(doorSpanV * 2) / 2);
+              fireDragEnd(kind, obj.id, { x: num(tmp.map_x), y: num(tmp.map_y), rot: normRot(tmp.map_rot), w: g.w, d: g.d });
+            }
+            return;
+          }
+          if (moved && nx !== null) {
+            var fx = Math.min(Math.max(Math.round(nx * 2) / 2, 0), Math.max(0, w - f.fw));
+            var fy = Math.min(Math.max(Math.round(ny * 2) / 2, 0), Math.max(0, d - f.fd));
+            el.style.left = pct(fx, w); el.style.top = pct(fy, d);
+            fireDragEnd(kind, obj.id, { x: fx, y: fy, rot: normRot(obj.map_rot), w: g.w, d: g.d });
+          }
+        }
+        el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+        e.preventDefault();
+      });
+    }
+    Array.prototype.forEach.call(map.querySelectorAll('[data-scrack]'), function (el) { wireDrag(el, 'rack', rackById(el.getAttribute('data-scrack'))); });
+    Array.prototype.forEach.call(map.querySelectorAll('[data-scitem]'), function (el) { wireDrag(el, 'item', itemById(el.getAttribute('data-scitem'))); });
+    /* Honour a selection the app rendered with (selectedRackId /
+       selectedItemId), so the resize handle appears without a tap. */
+    if (opts.selectedRackId) selectVisual('rack', opts.selectedRackId);
+    else if (opts.selectedItemId) selectVisual('item', opts.selectedItemId);
+    return { detach: detach };
+    function detach() { cleanups.forEach(function (f) { f(); }); cleanups = []; }
+  }
+
+  /* ---------- elevation interactions ----------
+     Editable: device click -> onDeviceSelect(id); empty-block click
+     -> onEmptyActivate(botU, topU, clickedU) with clickedU derived
+     from the click's Y inside the block (Manage's behaviour);
+     Ports button -> onPorts(switchId), stopPropagation.
+     Read-only: only the Ports button is wired. */
+  function attachElevationInteractions(rootEl, opts) {
+    opts = opts || {};
+    var col = rootEl.classList && rootEl.classList.contains('sc-rackcol') ? rootEl : rootEl.querySelector('.sc-rackcol');
+    if (!col) return { detach: function () {} };
+    var cleanups = [];
+    function on(el, ev, fn) { el.addEventListener(ev, fn); cleanups.push(function () { el.removeEventListener(ev, fn); }); }
+    Array.prototype.forEach.call(col.querySelectorAll('[data-scports]'), function (b) {
+      on(b, 'click', function (e) { e.stopPropagation(); if (typeof opts.onPorts === 'function') opts.onPorts(b.getAttribute('data-scports')); });
+    });
+    if (opts.editable) {
+      Array.prototype.forEach.call(col.querySelectorAll('[data-scdev]'), function (dv) {
+        on(dv, 'click', function () { if (typeof opts.onDeviceSelect === 'function') opts.onDeviceSelect(dv.getAttribute('data-scdev')); });
+      });
+      Array.prototype.forEach.call(col.querySelectorAll('[data-scempty]'), function (em) {
+        on(em, 'click', function (e) {
+          var parts = em.getAttribute('data-scempty').split(':'), bot = parseInt(parts[0], 10), top = parseInt(parts[1], 10);
+          var rect = em.getBoundingClientRect();
+          var rows = top - bot + 1, idx = Math.min(rows - 1, Math.max(0, Math.floor((e.clientY - rect.top) / ROW)));
+          if (typeof opts.onEmptyActivate === 'function') opts.onEmptyActivate(bot, top, top - idx);
+        });
+      });
+    }
+    return { detach: function () { cleanups.forEach(function (f) { f(); }); } };
+  }
+
+  return {
+    VERSION: '1.0.0-phase1',
+    ROW: ROW,
+    DOOR_T: DOOR_T,
+    TYPES: TYPES,
+    esc: esc,
+    typeLabel: typeLabel,
+    normRot: normRot,
+    isVert: isVert,
+    itemFoot: itemFoot,
+    rackFoot: rackFoot,
+    itemLayer: itemLayer,
+    trayWidthIn: trayWidthIn,
+    clampToRoom: clampToRoom,
+    clampRack: clampRack,
+    clampItem: clampItem,
+    sizeRules: sizeRules,
+    clampSize: clampSize,
+    rotateRackGeom: rotateRackGeom,
+    rotateItemGeom: rotateItemGeom,
+    doorWall: doorWall,
+    doorSpan: doorSpan,
+    doorSet: doorSet,
+    doorCenter: doorCenter,
+    doorStripFt: doorStripFt,
+    doorStyle: doorStyle,
+    doorSVG: doorSVG,
+    fitSize: fitSize,
+    itemLabel: itemLabel,
+    rackSublabel: rackSublabel,
+    renderRoomMap: renderRoomMap,
+    elevBlocks: elevBlocks,
+    renderElevation: renderElevation,
+    attachMapInteractions: attachMapInteractions,
+    attachElevationInteractions: attachElevationInteractions
+  };
+})();
 /* ============ NETWORK (v5.13) ============ */
 /* The site's network rooms, racks, rack devices and room items
    (cable trays, wall panels and doors) — the records
@@ -2651,9 +3277,6 @@ function cableHistoryHTML(p){
    same port screen in project flavor (no site banner). */
 var netRooms=[], netRacks=[], netDevices=[], netItems=[];
 var netRoomId=null, netRackId=null, netSwId=null, netFromLog=false;
-var NET_TYPES=[['switch','Switch'],['patch_panel','Patch panel'],['ups','UPS'],['nvr_server','NVR / Server'],['router_firewall','Router / Firewall'],['pdu','PDU'],['cable_manager','Cable manager'],['blank','Blank'],['other','Other']];
-var NET_ROW=26;
-function netTypeLabel(t){for(var i=0;i<NET_TYPES.length;i++)if(NET_TYPES[i][0]===t)return NET_TYPES[i][1];return 'Other';}
 function loadNetwork(){
   if(!sb||!sbUser) return Promise.resolve();
   return Promise.all([
@@ -2675,10 +3298,6 @@ function netRoomsOf(siteId){if(!siteId)return [];return netRooms.filter(function
 function netRacksOf(roomId){return netRacks.filter(function(r){return r.room_id===roomId&&!r.deleted_at;}).sort(netSortName);}
 function netDevsOf(rackId){return netDevices.filter(function(d){return d.rack_id===rackId&&!d.deleted_at;});}
 function netItemsOf(roomId){return netItems.filter(function(it){return it.room_id===roomId&&!it.deleted_at;}).sort(netSortName);}
-function netItemAbove(it){ // v5.15: room_items.layer (set in Manage) \u2014 'above' stacks over the rack blocks, 'below' stays under them; no stored layer: trays default above, panels and doors below
-  if(it.layer==='above')return true;
-  if(it.layer==='below')return false;
-  return it.type==='cable_tray';}
 function netUsedU(rackId){return netDevsOf(rackId).reduce(function(n,d){return n+(d.u_size||1);},0);}
 function netSiteSwitches(siteId){if(!siteId)return [];return data.portSwitches.filter(function(s){return s.siteId===siteId;}).sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});}
 function netPlacementOf(swId){
@@ -2738,27 +3357,6 @@ function networkHTML(p){
   }
   return netRoomsHTML(p);
 }
-/* A door symbol in a size_w square anchored at map_x/map_y: the
-   base glyph has its wall along the top edge, hinge at the left,
-   swing 'in' (arc opens into the room). Hinge/swing mirror the
-   glyph, map_rot rotates it onto its wall. Pure display: the SVG
-   is inert and the wrapper keeps pointer-events:none. */
-function netDoorHTML(it,w,d){
-  var rot=((Number(it.map_rot)||0)%360+360)%360;
-  var swing=it.door_swing==='out'?'out':'in', hinge=it.door_hinge==='right'?'right':'left';
-  var iw=Number(it.size_w)||3;
-  var mt=hinge==='right'?(swing==='out'?'translate(100 0) scale(-1 -1)':'translate(100 0) scale(-1 1)'):(swing==='out'?'scale(1 -1)':'');
-  var svg='<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;width:100%;height:100%">'
-    +'<g'+(rot?' transform="rotate('+rot+' 50 50)"':'')+'><g'+(mt?' transform="'+mt+'"':'')+'>'
-    +'<rect class="dgap" x="0" y="-4" width="100" height="8"></rect>'
-    +'<path class="dwedge" d="M0 0 L100 0 A100 100 0 0 1 0 100 Z"></path>'
-    +'<path class="darc" d="M100 0 A100 100 0 0 1 0 100"></path>'
-    +'<line class="dlf" x1="0" y1="0" x2="0" y2="100"></line>'
-    +'<circle class="dhinge" cx="0" cy="0" r="2.6"></circle>'
-    +'</g></g></svg>';
-  return '<div class="net-item net-door" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(iw/d*100)+'%">'
-    +svg+'<span class="inm dlab">'+esc(it.name)+'</span></div>';
-}
 function netRoomsHTML(p){
   var rooms=netRoomsOf(p.siteId);
   if(!rooms.some(function(r){return r.id===netRoomId;}))netRoomId=rooms.length?rooms[0].id:null;
@@ -2771,31 +3369,8 @@ function netRoomsHTML(p){
   var w=Number(room.width_ft)||14, d=Number(room.depth_ft)||10;
   h+='<div class="card"><h3>'+esc(room.name)+' \u2014 top-down</h3>'
     +'<div class="kv" style="margin:6px 0 10px"><span class="mut">'+w+' ft \u2014 '+Math.round(w*12)+' in</span><span class="mut">'+d+' ft deep</span></div>'
-    +'<div class="net-map" style="aspect-ratio:'+w+'/'+d+';background-size:'+(50/w)+'% '+(50/d)+'%;background-image:linear-gradient(rgba(255,255,255,0.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.045) 1px,transparent 1px)">';
-  netItemsOf(room.id).forEach(function(it){
-    if(netItemAbove(it))return; // v5.15: 'above' items draw in a second pass, over the racks
-    if(it.type==='door'){h+=netDoorHTML(it,w,d);return;}
-    var irot=((it.map_rot||0)%180)!==0;
-    var iw=irot?Number(it.size_d):Number(it.size_w), ih=irot?Number(it.size_w):Number(it.size_d);
-    h+='<div class="net-item '+(it.type==='cable_tray'?'net-tray':'net-panel')+(irot?' vert':'')+'" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(ih/d*100)+'%">'
-      +'<span class="inm">'+esc(it.name)+'</span></div>';
-  });
-  racks.forEach(function(r){
-    var rot=((r.map_rot||0)%180)!==0;
-    var fw=rot?Number(r.fp_d):Number(r.fp_w), fd=rot?Number(r.fp_w):Number(r.fp_d);
-    h+='<button type="button" class="net-rack" onclick="netOpenRack(\''+r.id+'\')" style="left:'+(Number(r.map_x)/w*100)+'%;top:'+(Number(r.map_y)/d*100)+'%;width:'+(fw/w*100)+'%;height:'+(fd/d*100)+'%">'
-      +'<span class="rnm">'+esc(r.name)+'</span><span class="rsub">'+(r.height_u||42)+'U \u00b7 '+netDevsOf(r.id).length+' devices</span></button>';
-  });
-  netItemsOf(room.id).forEach(function(it){
-    if(!netItemAbove(it))return;
-    if(it.type==='door'){h+=netDoorHTML(it,w,d);return;}
-    var irot=((it.map_rot||0)%180)!==0;
-    var iw=irot?Number(it.size_d):Number(it.size_w), ih=irot?Number(it.size_w):Number(it.size_d);
-    h+='<div class="net-item '+(it.type==='cable_tray'?'net-tray':'net-panel')+(irot?' vert':'')+'" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(ih/d*100)+'%">'
-      +'<span class="inm">'+esc(it.name)+'</span></div>';
-  });
-  h+='</div><div class="net-legend"><span class="net-lg"><span class="net-sw sw-rack"></span>Rack</span><span class="net-lg"><span class="net-sw sw-tray"></span>Cable tray</span><span class="net-lg"><span class="net-sw sw-panel"></span>Wall panel</span><span class="net-lg"><span class="net-sw sw-door"></span>Door</span></div>'
-    +'<p class="mut" style="margin-top:10px">Tap a rack to see its elevation. View-only \u2014 the layout is managed in Manage.</p></div>';
+    +SCR.renderRoomMap(room,racks,netItemsOf(room.id),{editable:false,legend:true,devices:netDevices,labels:{trayWidthIn:false,switchPorts:false},esc:esc})
+    +'<p class="mut" style="margin-top:10px">Tap a rack to see its elevation. View-only — the layout is managed in Manage.</p></div>';
   h+='<div class="card"><h3>Racks in '+esc(room.name)+'</h3>';
   if(!racks.length)h+='<p class="mut">No racks in this room yet.</p>';
   racks.forEach(function(r){
@@ -2838,29 +3413,16 @@ function netElevHTML(p,room,rack){
   var h='<button class="btn sec sml" onclick="netBack()">\u2039 '+esc(room.name)+'</button>'
     +modHero(p,rack.name+' \u2014 '+height+'U',used+'U used')
     +'<p class="mut" style="margin:0 2px 12px">'+esc(p.customer||'')+(p.site?' \u00b7 '+esc(p.site):'')+' \u00b7 '+esc(room.name)+' \u00b7 '+used+'U used \u00b7 '+(height-used)+'U free</p>';
-  var byTop={},covered={};
-  devs.forEach(function(dv){byTop[dv.u_start+(dv.u_size||1)-1]=dv;for(var u=dv.u_start;u<dv.u_start+(dv.u_size||1);u++)covered[u]=dv;});
-  var col='',u=height;
-  while(u>=1){
-    if(byTop[u]){
-      var dv=byTop[u],sz=dv.u_size||1;
-      var lab=sz>1?'U'+dv.u_start+'\u2013'+(dv.u_start+sz-1):'U'+dv.u_start;
-      col+='<div class="net-block" style="height:'+(sz*NET_ROW)+'px"><span class="net-ulab">'+lab+'</span>'
-        +'<div class="net-dev t-'+esc(dv.type)+'"><span class="dn">'+esc(dv.name)+'</span><span class="dt">\u00b7 '+esc(netTypeLabel(dv.type))+'</span>'
-        +(dv.type==='patch_panel'?'<span class="net-ticks"></span>':'')
-        +(dv.type==='switch'&&dv.switch_id?'<button type="button" class="net-portsbtn" onclick="netOpenPorts(\''+dv.switch_id+'\')">Ports \u203a</button>':'')
-        +'</div></div>';
-      u-=sz;
-    }else{
-      var top=u;while(u>=1&&!covered[u])u--;
-      var bot=u+1,n=top-bot+1;
-      col+='<div class="net-block" style="height:'+(n*NET_ROW)+'px"><span class="net-ulab">'+(n>1?'U'+bot+'\u2013'+top:'U'+top)+'</span>'
-        +'<div class="net-empty">Empty \u2014 '+n+'U free</div></div>';
-    }
-  }
-  h+='<div class="net-rackcol">'+col+'</div>'
-    +'<p class="mut" style="margin-top:12px">Tap a switch to open its port screen. View-only \u2014 changes to the layout are made in Manage.</p>';
+  h+=SCR.renderElevation(rack,devs,{editable:false,labels:{switchPorts:false},esc:esc});
+  h+='<p class="mut" style="margin-top:12px">Tap a switch to open its port screen. View-only \u2014 changes to the layout are made in Manage.</p>';
   return h;
+}
+function netWireCore(){ // v5.19: wire the core's read-only surfaces — rack taps open the elevation, the elevation's Ports buttons open the shared port screen; room items stay inert (core sc-ro tap-through)
+  var body=$('tabBody');if(!body||typeof SCR==='undefined')return;
+  var map=body.querySelector('.sc-map');
+  if(map)SCR.attachMapInteractions(map,{editable:false,onRackActivate:function(id){netOpenRack(id);}});
+  var col=body.querySelector('.sc-rackcol');
+  if(col)SCR.attachElevationInteractions(col,{editable:false,onPorts:function(swId){netOpenPorts(swId);}});
 }
 function netPortsHTML(p,sw){
   var place=netPlacementOf(sw.id);
@@ -3623,6 +4185,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.19',items:['The Network room map and rack elevations now draw through the shared room renderer that Field Kit Manage uses — doors show their wall strip, leaf and swing, and racks and room items keep their exact size at every screen size','The room layout stays view-only, exactly as before']},
  {v:'5.18',items:['Fixed the Network room map: cable trays, wall panels and doors that sit above the racks now draw at their true size \u2014 a rotated tray shows its full length over the rack, matching Field Kit Manage exactly','The room layout stays view-only, exactly as before']},
  {v:'5.17',items:['A switch that has been placed in a rack at a site is managed from Field Kit Manage \u2014 on its port screen here its details are locked, and its port count can no longer be changed. Its ports stay fully editable here','Switches that are not placed in a rack yet, and switches that belong to a single job, work exactly as before']},
  {v:'5.16',items:['New: a sign-in-free demo \u2014 tap \u201cView the demo\u201d on the sign-in screen (or add ?demo to the address) to explore Field Kit with sample data. Nothing in the demo is saved or synced']},

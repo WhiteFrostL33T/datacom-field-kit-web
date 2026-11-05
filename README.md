@@ -4,7 +4,7 @@ The Datacom Field Kit as a universal web app for **Android and iOS**.
 Installable, works offline, no account, no cloud — all data lives in the
 browser on the device (localStorage).
 
-**Current version:** v5.18
+**Current version:** v5.19
 
 This repo is now the single home of the app. The standalone Android APK
 is retired (v2.3 was the last APK build); all new work ships here.
@@ -38,6 +38,8 @@ GitHub Pages (Deploy from branch → `main`, root):
 https://whitefrostl33t.github.io/datacom-field-kit-web/
 
 ## Changelog
+
+- **v5.19** — Network room map and rack elevations now draw through the shared room renderer that Field Kit Manage uses — doors show their wall strip, leaf and swing, and racks and room items keep their exact size at every screen size. The room layout stays view-only.
 
 - **v5.18** — Fixed the Network room map: cable trays, wall panels and doors that sit above the racks now draw at their true size — a rotated tray shows its full length over the rack, matching Field Kit Manage.
 
