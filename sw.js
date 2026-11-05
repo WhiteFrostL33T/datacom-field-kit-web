@@ -1,4 +1,4 @@
-var CACHE = 'fieldkit-v5.17';
+var CACHE = 'fieldkit-v5.18';
 var ASSETS = ['./', './index.html', './manifest.json', './logo.png',
   './apple-touch-icon.png', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', function (e) {

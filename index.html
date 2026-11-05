@@ -971,7 +971,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.17';
+var APP_VERSION='5.18';
 var DEMO=/[?&]demo\b/.test(location.search); // v5.16: sign-in-free demo mode (?demo) — see the demo block before the auth section
 var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
@@ -2756,7 +2756,7 @@ function netDoorHTML(it,w,d){
     +'<line class="dlf" x1="0" y1="0" x2="0" y2="100"></line>'
     +'<circle class="dhinge" cx="0" cy="0" r="2.6"></circle>'
     +'</g></g></svg>';
-  return '<div class="net-item net-door" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(iw/d*100)+'">'
+  return '<div class="net-item net-door" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(iw/d*100)+'%">'
     +svg+'<span class="inm dlab">'+esc(it.name)+'</span></div>';
 }
 function netRoomsHTML(p){
@@ -2791,7 +2791,7 @@ function netRoomsHTML(p){
     if(it.type==='door'){h+=netDoorHTML(it,w,d);return;}
     var irot=((it.map_rot||0)%180)!==0;
     var iw=irot?Number(it.size_d):Number(it.size_w), ih=irot?Number(it.size_w):Number(it.size_d);
-    h+='<div class="net-item '+(it.type==='cable_tray'?'net-tray':'net-panel')+(irot?' vert':'')+'" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(ih/d*100)+'">'
+    h+='<div class="net-item '+(it.type==='cable_tray'?'net-tray':'net-panel')+(irot?' vert':'')+'" style="left:'+(Number(it.map_x)/w*100)+'%;top:'+(Number(it.map_y)/d*100)+'%;width:'+(iw/w*100)+'%;height:'+(ih/d*100)+'%">'
       +'<span class="inm">'+esc(it.name)+'</span></div>';
   });
   h+='</div><div class="net-legend"><span class="net-lg"><span class="net-sw sw-rack"></span>Rack</span><span class="net-lg"><span class="net-sw sw-tray"></span>Cable tray</span><span class="net-lg"><span class="net-sw sw-panel"></span>Wall panel</span><span class="net-lg"><span class="net-sw sw-door"></span>Door</span></div>'
@@ -3623,6 +3623,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.18',items:['Fixed the Network room map: cable trays, wall panels and doors that sit above the racks now draw at their true size \u2014 a rotated tray shows its full length over the rack, matching Field Kit Manage exactly','The room layout stays view-only, exactly as before']},
  {v:'5.17',items:['A switch that has been placed in a rack at a site is managed from Field Kit Manage \u2014 on its port screen here its details are locked, and its port count can no longer be changed. Its ports stay fully editable here','Switches that are not placed in a rack yet, and switches that belong to a single job, work exactly as before']},
  {v:'5.16',items:['New: a sign-in-free demo \u2014 tap \u201cView the demo\u201d on the sign-in screen (or add ?demo to the address) to explore Field Kit with sample data. Nothing in the demo is saved or synced']},
  {v:'5.15',items:['Ports live in Network now on jobs that belong to a site \u2014 the separate Ports tab is retired there, and switch ports open from the racks they sit in','The Network card shows on every site job, even before any rooms are designed, and a site switch can be added right there','A job\u2019s own switches are listed in Network too, with the same port screen and delete as before']},
