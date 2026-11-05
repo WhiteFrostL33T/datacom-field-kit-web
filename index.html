@@ -1040,7 +1040,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.19';
+var APP_VERSION='5.20';
 var DEMO=/[?&]demo\b/.test(location.search); // v5.16: sign-in-free demo mode (?demo) — see the demo block before the auth section
 var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
@@ -4185,6 +4185,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.20',items:['The sign-in screen no longer offers a demo entry \u2014 the demo is now reached by its link only (add ?demo to the address)','The demo itself is unchanged: same sample data, nothing saved or synced']},
  {v:'5.19',items:['The Network room map and rack elevations now draw through the shared room renderer that Field Kit Manage uses — doors show their wall strip, leaf and swing, and racks and room items keep their exact size at every screen size','The room layout stays view-only, exactly as before']},
  {v:'5.18',items:['Fixed the Network room map: cable trays, wall panels and doors that sit above the racks now draw at their true size \u2014 a rotated tray shows its full length over the rack, matching Field Kit Manage exactly','The room layout stays view-only, exactly as before']},
  {v:'5.17',items:['A switch that has been placed in a rack at a site is managed from Field Kit Manage \u2014 on its port screen here its details are locked, and its port count can no longer be changed. Its ports stay fully editable here','Switches that are not placed in a rack yet, and switches that belong to a single job, work exactly as before']},
@@ -4399,8 +4400,7 @@ function loadCompanyBrand(){
 }
 /* ---------- demo mode (v5.16) ----------
    Sign-in-free exploration, mirroring Field Kit Manage's demo:
-   ?demo in the address (or the sign-in screen's "View the demo"
-   link) boots the app on the fictional seed below. No Supabase
+   ?demo in the address boots the app on the fictional seed below. No Supabase
    client is created, no session is read, and nothing is fetched
    or pushed: save() routes here (demoPersist — one dedicated
    localStorage key), every loader no-ops without a client, and
@@ -4675,8 +4675,7 @@ function renderLogin(){
     +'<label class="mut" style="font-size:.8rem">Password</label>'
     +'<input id="li_pass" type="password" autocomplete="current-password" style="width:100%;margin:4px 0 16px" onkeydown="if(event.key===\'Enter\')doLogin()">'
     +'<button class="btn pri" style="width:100%" onclick="doLogin()">Sign in</button>'
-    +'<div style="text-align:center;margin-top:18px"><a href="?demo" style="color:var(--acc);font-weight:600;text-decoration:none">View the demo</a>'
-    +'<div class="mut" style="font-size:.76rem;margin-top:4px">Sample data \u2014 no sign-in, nothing is saved</div></div></div>';
+    +'</div>';
 }
 
 /* ---------- sync engine ---------- */
