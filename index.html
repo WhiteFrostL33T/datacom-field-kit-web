@@ -1040,7 +1040,7 @@ window.FK={
       totalHosts:total,usableHosts:usable,prefix:pre};}
 };
 /* ============ data layer ============ */
-var APP_VERSION='5.20';
+var APP_VERSION='5.21';
 var DEMO=/[?&]demo\b/.test(location.search); // v5.16: sign-in-free demo mode (?demo) — see the demo block before the auth section
 var MODULES=[['time','Time'],['materials','Materials'],['finallog','Connectwise Notes'],
   ['storage','Storage'],['poe','PoE'],['subnet','Subnet / IP'],['ports','Ports']];
@@ -1117,7 +1117,7 @@ function tryCachedBoot(){
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
-  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function $(id){return document.getElementById(id);}
 function val(id){var e=$(id);return e?e.value.trim():'';}
 function num(id){var v=parseFloat(val(id));return isFinite(v)?v:0;}
@@ -4185,6 +4185,7 @@ function renderTimesheet(){
 
 /* ============ ABOUT ============ */
 var CHANGELOG=[
+ {v:'5.21',items:['Security hardening: text escaping now covers apostrophes as well as quotes and angle brackets \u2014 the same escaping Field Kit Manage already uses','No visual changes: names, notes and labels display exactly as before, apostrophes included']},
  {v:'5.20',items:['The sign-in screen no longer offers a demo entry \u2014 the demo is now reached by its link only (add ?demo to the address)','The demo itself is unchanged: same sample data, nothing saved or synced']},
  {v:'5.19',items:['The Network room map and rack elevations now draw through the shared room renderer that Field Kit Manage uses — doors show their wall strip, leaf and swing, and racks and room items keep their exact size at every screen size','The room layout stays view-only, exactly as before']},
  {v:'5.18',items:['Fixed the Network room map: cable trays, wall panels and doors that sit above the racks now draw at their true size \u2014 a rotated tray shows its full length over the rack, matching Field Kit Manage exactly','The room layout stays view-only, exactly as before']},
